@@ -1,0 +1,19 @@
+[Unit]
+Description=Wenxin Website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/wenxin/Wen_wbsite/backend
+EnvironmentFile=/root/wenxin/Wen_wbsite/backend/.env
+Environment=PATH=/root/.nvm/versions/node/v24.18.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+ExecStart=/root/.nvm/versions/node/v24.18.0/bin/node dist/server.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

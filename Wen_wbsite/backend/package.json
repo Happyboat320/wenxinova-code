@@ -1,0 +1,56 @@
+{
+  "name": "wenxin-backend",
+  "version": "1.0.0",
+  "description": "文心新述 - 古典小说智能改编平台后端",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "import:excel": "tsx scripts/import-excel.ts",
+    "import:text": "tsx scripts/import-text.ts",
+    "import:json": "tsx scripts/import-json.ts",
+    "import:all": "tsx scripts/import-excel.ts --clear && tsx scripts/import-text.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "prisma",
+    "sqlite",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@11.14.0",
+  "dependencies": {
+    "@alicloud/dypnsapi20170525": "^2.0.0",
+    "@alicloud/openapi-core": "^1.0.8",
+    "@darabonba/typescript": "^1.0.5",
+    "@prisma/client": "^6.19.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.19.10",
+    "@types/supertest": "^6.0.2",
+    "prisma": "^6.19.0",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}

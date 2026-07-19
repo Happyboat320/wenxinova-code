@@ -1,0 +1,7 @@
+allowBuilds:
+  '@alicloud/openapi-core': true
+  # 自动 postinstall 在 Node.js 24 下会卡住；项目通过 pnpm generate 显式生成。
+  '@prisma/client': false
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true

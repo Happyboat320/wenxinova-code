@@ -1,0 +1,107 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 书籍表
+model Book {
+  id             Int      @id @default(autoincrement())
+  title          String
+  author         String
+  dynasty        String?  // 年代（唐、宋等）
+  description    String?
+  image          String?
+  category       String?  // 类别（传奇等）
+  theme          String?  // 主题
+  mainCharacters String?  // 主要人物
+  keywords       String?  // 关键词
+  annotationCount Int?    // 注释数目
+  originalText   String?  // 原文内容
+  translatedText String?  // 译文内容
+  summary        String?  // 摘要/梗概
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // 关联
+  characters Character[]
+  annotations Annotation[]
+  creations   Creation[]
+}
+
+// 角色表（剧本杀角色）
+model Character {
+  id          Int      @id @default(autoincrement())
+  bookId      Int
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+}
+
+model Annotation {
+  id        Int      @id @default(autoincrement())
+  bookId    Int
+  index     Int
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, index])
+}
+
+// 用户表
+model User {
+  id              Int              @id @default(autoincrement())
+  phone           String           @unique
+  phoneVerifiedAt DateTime?
+  status          String           @default("active")
+  creations       Creation[]
+  refreshSessions RefreshSession[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+// Refresh Token 会话；数据库中只保存令牌哈希
+model RefreshSession {
+  id           String    @id
+  userId       Int
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// 创作记录表
+model Creation {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  bookId    Int?
+  prompt    String   // 提示词
+  content   String   // 生成的内容
+  createdAt DateTime @default(now())
+
+  // 关联
+  user User @relation(fields: [userId], references: [id])
+  book Book? @relation(fields: [bookId], references: [id])
+}

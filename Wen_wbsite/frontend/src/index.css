@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', 'Noto Serif SC', sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  --primary-color: #8B2323;
+  --secondary-color: #CD5C5C;
+  --tertiary-color: #DEB887;
+  --text-color: #333333;
+  --bg-color: #F9F6F0;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  background-image: url("https://space.coze.cn/api/coze_space/gen_image?image_size=landscape_16_9&prompt=chinese%20traditional%20paper%20texture%20background&sign=440e022508abe4f3f06fe67dbf40f0a8");
+  background-repeat: repeat;
+  background-size: 1000px 1000px;
+}
+
+.book-card {
+  @apply bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-amber-100;
+  background-image: url("https://space.coze.cn/api/coze_space/gen_image?image_size=landscape_4_3&prompt=ancient%20chinese%20scroll%20texture&sign=64a5ba65cbac9b4dd80eef0391491243");
+  background-size: cover;
+  background-blend-mode: overlay;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-amber-600 to-amber-800 text-white font-medium py-2 px-4 rounded-lg hover:from-amber-500 hover:to-amber-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
+}
+
+.btn-secondary {
+  @apply bg-amber-50 text-amber-800 border border-amber-200 font-medium py-2 px-4 rounded-lg hover:bg-amber-100 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5;
+}
+
+.title-serif {
+  @apply font-['Noto_Serif_SC'] font-bold text-amber-900;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #DEB887;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #CD853F;
+}
+
+.content-serif {
+  @apply font-['Noto_Serif_SC'] font-medium;
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease-in-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.floating {
+  animation: float 6s ease-in-out infinite;
+}
+
+.book-shadow {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(139, 35, 35, 0.05);
+}

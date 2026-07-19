@@ -1,0 +1,2 @@
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend;pnpm i;pnpm prisma generate; pnpm dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend;pnpm i;pnpm dev"
