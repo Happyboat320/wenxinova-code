@@ -3,7 +3,7 @@ import * as deepseek from '../../lib/deepseek.js';
 
 // 获取书籍列表
 export async function getBookList(page: number = 1) {
-  const pageSize = 10;
+  const pageSize = 9;
   const skip = (page - 1) * pageSize;
 
   const [books, total] = await Promise.all([
@@ -12,6 +12,8 @@ export async function getBookList(page: number = 1) {
         id: true,
         title: true,
         author: true,
+        description: true,
+        summary: true,
       },
       orderBy: { id: 'asc' },
       skip,
@@ -38,6 +40,15 @@ export async function getBookContent(id: number) {
       title: true,
       author: true,
       originalText: true,
+      mainCharacters: true,
+      characters: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+        },
+        orderBy: { id: 'asc' },
+      },
       annotations: {
         select: {
           index: true,
@@ -56,7 +67,14 @@ export async function getBookContent(id: number) {
     title: book.title,
     author: book.author,
     content: book.originalText || '',
-    annotations: book.annotations.map(a => a.content),
+    // 保留数据库里的真实序号；注释可能不是从 1 连续排列，不能再用数组下标猜测序号。
+    annotations: book.annotations,
+    characters: book.characters.length > 0
+      ? book.characters
+      : (book.mainCharacters || '')
+          .split(/[、，,；;\s]+/)
+          .map((name, index) => ({ id: -(index + 1), name: name.trim(), description: null }))
+          .filter(character => character.name),
   };
 }
 

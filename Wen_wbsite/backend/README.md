@@ -111,8 +111,9 @@ pnpm dev
 ## API 接口
 
 ### 认证模块
-- `POST /api/auth/sms/send` - 发送短信验证码（手机号/IP 限流）
-- `POST /api/auth/sms/verify` - 验证码登录，首次登录自动注册
+- `POST /api/auth/register/code` - 发送注册验证码（手机号/IP 限流）
+- `POST /api/auth/register` - 使用手机号、验证码和密码注册；旧短信账号可在此设置密码
+- `POST /api/auth/login` - 使用手机号和密码登录（手机号/IP 限流）
 - `POST /api/auth/refresh` - 轮换 Refresh Token Cookie
 - `GET /api/auth/me` - 获取当前用户（需要 Access Token）
 - `POST /api/auth/logout` - 撤销当前会话并清除 Cookie

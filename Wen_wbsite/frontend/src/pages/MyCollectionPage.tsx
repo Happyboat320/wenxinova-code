@@ -53,7 +53,7 @@ const MyCollectionPage = () => {
           <div className="bg-white rounded-2xl p-10 shadow-lg text-center">
             <h3 className="text-2xl font-medium mb-3">请先登录</h3>
             <p className="opacity-70 mb-6">登录后可保存和查看您的创作记录。</p>
-            <button onClick={openLogin} className="btn-primary inline-block">短信登录</button>
+            <button onClick={openLogin} className="btn-primary inline-block">账号登录</button>
           </div>
         )}
 

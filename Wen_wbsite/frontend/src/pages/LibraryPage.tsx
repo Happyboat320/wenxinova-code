@@ -8,6 +8,8 @@ type Book = {
   id: number;
   title: string;
   author: string;
+  description: string | null;
+  summary: string | null;
 };
 
 const LibraryPage = () => {
@@ -117,7 +119,9 @@ const LibraryPage = () => {
               </div>
 
               <div className="p-6">
-                <p className="mb-6 line-clamp-3 opacity-80">探索中国古典文学的瑰宝，感受深厚的文化底蕴。</p>
+                <p className="mb-6 line-clamp-3 opacity-80">
+                  {book.description?.trim() || book.summary?.trim() || '探索中国古典文学的瑰宝，感受深厚的文化底蕴。'}
+                </p>
                 <button
                   className="w-full btn-primary"
                   onClick={() => navigate(`/book/${book.id}`)}

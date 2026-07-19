@@ -16,13 +16,14 @@ import prisma from '../../lib/prisma.js';
 import { resetRateLimitsForTests } from './rate-limit.js';
 import { signRefreshToken } from './jwt.service.js';
 
-describe('短信认证与双令牌', () => {
+describe('密码认证与双令牌', () => {
   beforeAll(async () => {
     await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "RefreshSession"');
     await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "User"');
     await prisma.$executeRawUnsafe(`CREATE TABLE "User" (
       "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
       "phone" TEXT NOT NULL,
+      "passwordHash" TEXT,
       "phoneVerifiedAt" DATETIME,
       "status" TEXT NOT NULL DEFAULT 'active',
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -58,19 +59,28 @@ describe('短信认证与双令牌', () => {
     await prisma.$disconnect();
   });
 
-  it('非法手机号不会调用短信供应商，重复发送会被限流', async () => {
-    await request(app).post('/api/auth/sms/send').send({ phone: '123' }).expect(400);
-    expect(smsMocks.sendVerifyCode).not.toHaveBeenCalled();
-
-    await request(app).post('/api/auth/sms/send').send({ phone: '13800000000' }).expect(200);
-    await request(app).post('/api/auth/sms/send').send({ phone: '13800000000' }).expect(429);
-    expect(smsMocks.sendVerifyCode).toHaveBeenCalledTimes(1);
+  it('注册校验手机号和密码强度，并拒绝重复手机号', async () => {
+    await request(app).post('/api/auth/register/code').send({ phone: '123' }).expect(400);
+    await request(app).post('/api/auth/register/code').send({ phone: '13800000000' }).expect(200);
+    expect(smsMocks.sendVerifyCode).toHaveBeenCalledOnce();
+    await request(app).post('/api/auth/register').send({ phone: '123', password: 'password123', code: '123456' }).expect(400);
+    await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'short', code: '123456' }).expect(400);
+    await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'password123', code: '123456' }).expect(201);
+    await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'password123', code: '123456' }).expect(409);
   });
 
-  it('验证码首次登录自动创建用户，Bearer Access Token 可读取本人信息', async () => {
+  it('注册保存密码哈希，密码登录后 Bearer Access Token 可读取本人信息', async () => {
+    await request(app)
+      .post('/api/auth/register')
+      .send({ phone: '13800000000', password: 'password123', code: '123456' })
+      .expect(201);
+    const stored = await prisma.user.findUniqueOrThrow({ where: { phone: '13800000000' } });
+    expect(stored.passwordHash).toBeTruthy();
+    expect(stored.passwordHash).not.toBe('password123');
+
     const login = await request(app)
-      .post('/api/auth/sms/verify')
-      .send({ phone: '13800000000', code: '123456' })
+      .post('/api/auth/login')
+      .send({ phone: '13800000000', password: 'password123' })
       .expect(200);
 
     expect(login.body.data.user.phone).toBe('13800000000');
@@ -82,15 +92,21 @@ describe('短信认证与双令牌', () => {
     expect(me.body.data.id).toBe(login.body.data.user.id);
     expect(await prisma.user.count()).toBe(1);
 
-    await request(app).post('/api/auth/sms/verify').send({ phone: '13800000000', code: '123456' }).expect(200);
-    expect(await prisma.user.count()).toBe(1);
+    await request(app).post('/api/auth/login').send({ phone: '13800000000', password: 'wrong-password' }).expect(401);
+    expect(smsMocks.checkVerifyCode).toHaveBeenCalledTimes(1);
+  });
+
+  it('旧短信账号可通过注册验证设置密码且保留原账号', async () => {
+    const legacy = await prisma.user.create({ data: { phone: '13700000000', phoneVerifiedAt: new Date() } });
+    const result = await request(app).post('/api/auth/register')
+      .send({ phone: legacy.phone, password: 'new-password', code: '123456' }).expect(201);
+    expect(result.body.data.user.id).toBe(legacy.id);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: legacy.id } })).passwordHash).toBeTruthy();
   });
 
   it('Refresh Token 轮换后旧令牌重放会撤销会话链', async () => {
-    const login = await request(app)
-      .post('/api/auth/sms/verify')
-      .send({ phone: '13900000000', code: '123456' })
-      .expect(200);
+    const login = await request(app).post('/api/auth/register')
+      .send({ phone: '13900000000', password: 'password123', code: '123456' }).expect(201);
     const oldCookie = login.headers['set-cookie'][0].split(';')[0];
 
     const refreshed = await request(app).post('/api/auth/refresh').set('Cookie', oldCookie).expect(200);

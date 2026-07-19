@@ -3,7 +3,8 @@
 ## 当前部署结构
 
 - 前端：React + Vite，构建结果位于 `frontend/dist/static`
-- 后端：Express + TypeScript，监听 `5000` 端口
+- HTTPS 入口：Nginx 监听 `80/443`，HTTP 自动跳转 HTTPS
+- 后端：Express + TypeScript，仅监听 `127.0.0.1:5000`
 - 数据库：SQLite，文件位于 `backend/prisma/data/app.db`
 - AI：DeepSeek API，默认模型为 `deepseek-chat`
 - 守护：systemd，退出 SSH 后继续运行，服务器重启后自动启动
@@ -41,6 +42,11 @@ DEEPSEEK_MODEL="deepseek-chat"
 DEEPSEEK_TRANSLATE_MODEL="deepseek-chat"
 AI_MOCK_MODE="false"
 NODE_ENV="production"
+HOST="127.0.0.1"
+AUTH_COOKIE_SECURE="true"
+AUTH_COOKIE_DOMAIN=""
+CORS_ORIGINS="https://8.134.215.157"
+TRUST_PROXY="true"
 ```
 
 请同时将 `JWT_SECRET` 改成足够长的随机值。不要把 `.env` 提交到版本库或发送给他人。
@@ -53,7 +59,11 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now wenxin
 ```
 
-访问地址：`http://服务器公网IP:5000`。云服务器安全组和本机防火墙需放行 TCP `5000`。
+公网访问地址：`https://8.134.215.157`。安全组只需对外开放 TCP `80/443`，不要开放 `5000`。
+
+Nginx 的 HTTP 申请阶段与最终 HTTPS 配置分别保存在
+`deploy/nginx-wenxin-http.conf` 和 `deploy/nginx-wenxin-https.conf`。Certbot 续期部署钩子为
+`deploy/reload-nginx.sh`，安装到 `/etc/letsencrypt/renewal-hooks/deploy/` 后会在续期成功时检查并重载 Nginx。
 
 ## 日常维护
 
@@ -101,13 +111,18 @@ cp /root/wenxin/Wen_wbsite/backend/prisma/data/app.db "/root/wenxin/app-$(date +
 sudo systemctl start wenxin
 ```
 
-## 可选：域名与 HTTPS
+## HTTPS 证书维护
 
-正式公网使用建议安装 Nginx，把域名的 `80/443` 端口反向代理到 `127.0.0.1:5000`，并使用 Certbot 配置 HTTPS。配置反向代理后，可将后端 `PORT` 保持为 `5000`，只对本机开放该端口。
+当前使用 Let's Encrypt 的短期 IP 证书。Certbot 定时器必须保持启用，可用以下命令检查：
+
+```bash
+sudo systemctl status snap.certbot.renew.timer
+sudo /snap/bin/certbot renew --dry-run --no-random-sleep-on-renew
+```
 
 ## 故障排查
 
-- 页面打不开：检查 `systemctl status wenxin`、安全组和 TCP `5000` 放行情况。
+- 页面打不开：检查 `systemctl status wenxin nginx`、安全组以及 TCP `80/443` 放行情况。
 - AI 返回失败：检查 `DEEPSEEK_API_KEY`、账户余额、服务器外网连通性和 `journalctl` 日志。
 - 修改前端后页面未变化：重新执行 `npm run build`，并强制刷新浏览器缓存。
 - Node 路径改变：更新 `deploy/wenxin.service` 中的 `Environment=PATH` 和 `ExecStart`，再重新复制服务文件并执行 `systemctl daemon-reload`。

@@ -35,15 +35,64 @@ const runtime = new RuntimeOptions({
   maxAttempts: 1,
 });
 
+interface ProviderDiagnostic {
+  code?: string;
+  message?: string;
+  requestId?: string;
+}
+
+function providerDiagnostic(caught: unknown): ProviderDiagnostic {
+  if (!caught || typeof caught !== 'object') return {};
+  const value = caught as Record<string, unknown>;
+  const data = value.data && typeof value.data === 'object' ? value.data as Record<string, unknown> : undefined;
+  return {
+    code: String(value.code || data?.Code || data?.code || 'UNKNOWN'),
+    message: String(value.message || data?.Message || data?.message || 'Unknown provider error')
+      .replace(/1[3-9]\d{9}/g, '<手机号已隐藏>')
+      .slice(0, 300),
+    requestId: String(value.requestId || data?.RequestId || data?.requestId || ''),
+  };
+}
+
+function providerError(diagnostic: ProviderDiagnostic): AuthError {
+  const code = diagnostic.code?.toUpperCase() || '';
+  if (code.includes('ACCESSKEY') || code.includes('SIGNATURE')) {
+    return new AuthError('短信服务认证配置错误，请联系管理员', 503, 'SMS_CREDENTIALS_INVALID');
+  }
+  if (code.includes('TEMPLATE')) {
+    return new AuthError('短信模板配置错误或尚未审核通过，请联系管理员', 503, 'SMS_TEMPLATE_INVALID');
+  }
+  if (code.includes('SIGN_NAME') || code.includes('SIGNATURE_NOT_MATCH')) {
+    return new AuthError('短信签名配置错误或尚未审核通过，请联系管理员', 503, 'SMS_SIGN_INVALID');
+  }
+  if (code.includes('FORBIDDEN') || code.includes('PERMISSION') || code.includes('RAM')) {
+    return new AuthError('短信服务账号缺少发送权限，请联系管理员', 503, 'SMS_PERMISSION_DENIED');
+  }
+  return new AuthError('验证码发送失败，请稍后重试', 502, 'SMS_SEND_FAILED');
+}
+
+function reportFailure(action: '发送' | '核验', diagnostic: ProviderDiagnostic): void {
+  console.error(`短信${action}失败`, {
+    providerCode: diagnostic.code || 'UNKNOWN',
+    providerMessage: diagnostic.message || 'Unknown provider error',
+    requestId: diagnostic.requestId || undefined,
+  });
+}
+
 export async function sendVerifyCode(phone: string): Promise<void> {
   try {
+    const templateCode = env('ALIYUN_SMS_TEMPLATE_CODE');
+    const templateParam = templateCode === '100001'
+      ? { code: '##code##', min: '5' }
+      : { code: '##code##' };
     const response = await getClient().sendSmsVerifyCodeWithOptions(
       new SendSmsVerifyCodeRequest({
         phoneNumber: phone,
         countryCode: '86',
         signName: env('ALIYUN_SMS_SIGN_NAME'),
-        templateCode: env('ALIYUN_SMS_TEMPLATE_CODE'),
-        templateParam: JSON.stringify({ code: '##code##' }),
+        templateCode,
+        // 系统模板 100001 同时包含 ${code} 与 ${min}，参数必须与模板变量完全匹配。
+        templateParam: JSON.stringify(templateParam),
         schemeName: process.env.ALIYUN_SMS_SCHEME_NAME || undefined,
         codeLength: 6,
         codeType: 1,
@@ -55,12 +104,19 @@ export async function sendVerifyCode(phone: string): Promise<void> {
       runtime,
     );
     if (response.body?.code !== 'OK' || response.body.success === false) {
-      throw new Error(`provider code: ${response.body?.code || 'UNKNOWN'}`);
+      const diagnostic = {
+        code: response.body?.code,
+        message: response.body?.message,
+        requestId: response.body?.requestId || response.body?.model?.requestId,
+      };
+      reportFailure('发送', diagnostic);
+      throw providerError(diagnostic);
     }
-  } catch (error) {
-    if (error instanceof AuthError) throw error;
-    console.error('短信发送失败（已隐藏供应商响应）');
-    throw new AuthError('验证码发送失败，请稍后重试', 502, 'SMS_SEND_FAILED');
+  } catch (caught) {
+    if (caught instanceof AuthError) throw caught;
+    const diagnostic = providerDiagnostic(caught);
+    reportFailure('发送', diagnostic);
+    throw providerError(diagnostic);
   }
 }
 
@@ -77,9 +133,9 @@ export async function checkVerifyCode(phone: string, code: string): Promise<bool
       runtime,
     );
     return response.body?.code === 'OK' && response.body.model?.verifyResult === 'PASS';
-  } catch (error) {
-    if (error instanceof AuthError) throw error;
-    console.error('短信核验失败（已隐藏供应商响应）');
+  } catch (caught) {
+    if (caught instanceof AuthError) throw caught;
+    reportFailure('核验', providerDiagnostic(caught));
     throw new AuthError('验证码校验服务暂不可用', 502, 'SMS_VERIFY_FAILED');
   }
 }
@@ -87,4 +143,3 @@ export async function checkVerifyCode(phone: string, code: string): Promise<bool
 export function resetSmsClientForTests(): void {
   client = undefined;
 }
-

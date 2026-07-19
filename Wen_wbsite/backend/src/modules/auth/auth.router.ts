@@ -50,56 +50,68 @@ function sendAuthError(res: Response, caught: unknown, fallback: string): void {
     res.status(caught.status).json(error(caught.message, caught.status));
     return;
   }
+  const retryAfter = Number((caught as { retryAfter?: number }).retryAfter || 0);
+  if (retryAfter > 0) {
+    res.setHeader('Retry-After', retryAfter);
+    res.status(429).json(error('尝试次数过多，请稍后再试', 429));
+    return;
+  }
   console.error(`${fallback}（详细错误已隐藏）`);
   res.status(500).json(error(fallback, 500));
 }
 
-authRouter.post('/sms/send', async (req, res) => {
+function readCredentials(req: Request) {
+  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!authService.PHONE_PATTERN.test(phone)) {
+    throw new AuthError('请输入正确的中国大陆手机号', 400, 'INVALID_PHONE');
+  }
+  if (!authService.isValidPassword(password)) {
+    throw new AuthError(`密码至少 ${authService.PASSWORD_MIN_LENGTH} 位，且不能超过 ${authService.PASSWORD_MAX_BYTES} 字节`, 400, 'INVALID_PASSWORD');
+  }
+  return { phone, password };
+}
+
+authRouter.post('/register/code', async (req, res) => {
   const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
   if (!authService.PHONE_PATTERN.test(phone)) {
     res.status(400).json(error('请输入正确的中国大陆手机号', 400));
     return;
   }
   try {
-    consumeLimit(`sms:phone:minute:${phone}`, 1, 60_000);
-    consumeLimit(`sms:phone:hour:${phone}`, 5, 3_600_000);
-    consumeLimit(`sms:phone:day:${phone}`, 15, 86_400_000);
-    consumeLimit(`sms:ip:hour:${req.ip}`, 20, 3_600_000);
-    consumeLimit(`sms:ip:day:${req.ip}`, 60, 86_400_000);
-    await authService.sendSms(phone);
-    console.info(`验证码已发送: ${phone.slice(0, 3)}****${phone.slice(-4)}`);
+    consumeLimit(`register-code:phone:minute:${phone}`, 1, 60_000);
+    consumeLimit(`register-code:phone:hour:${phone}`, 5, 3_600_000);
+    consumeLimit(`register-code:ip:hour:${req.ip}`, 20, 3_600_000);
+    await authService.sendRegistrationCode(phone);
     res.json(success({ retryAfter: 60 }, '验证码已发送'));
   } catch (caught) {
-    const retryAfter = (caught as { retryAfter?: number }).retryAfter;
-    if (retryAfter) {
-      res.setHeader('Retry-After', retryAfter);
-      res.status(429).json(error('发送过于频繁，请稍后重试', 429));
-      return;
-    }
     sendAuthError(res, caught, '验证码发送失败');
   }
 });
 
-authRouter.post('/sms/verify', async (req, res) => {
-  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
-  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
-  if (!authService.PHONE_PATTERN.test(phone) || !authService.CODE_PATTERN.test(code)) {
-    res.status(400).json(error('手机号或验证码格式不正确', 400));
-    return;
-  }
+authRouter.post('/register', async (req, res) => {
   try {
-    consumeLimit(`verify:phone:${phone}`, 8, 10 * 60_000);
-    consumeLimit(`verify:ip:${req.ip}`, 30, 10 * 60_000);
-    const result = await authService.verifySmsAndLogin(phone, code, metadata(req));
+    const { phone, password } = readCredentials(req);
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!authService.CODE_PATTERN.test(code)) throw new AuthError('请输入正确的验证码', 400, 'INVALID_SMS_CODE');
+    consumeLimit(`register:ip:${req.ip}`, 10, 60 * 60_000);
+    const result = await authService.register(phone, password, code, metadata(req));
+    setRefreshCookie(res, result.refreshToken, result.refreshExpiresIn);
+    res.status(201).json(success({ accessToken: result.accessToken, expiresIn: result.expiresIn, user: result.user }, '注册成功'));
+  } catch (caught) {
+    sendAuthError(res, caught, '注册失败');
+  }
+});
+
+authRouter.post('/login', async (req, res) => {
+  try {
+    const { phone, password } = readCredentials(req);
+    consumeLimit(`login:phone:${phone}`, 10, 10 * 60_000);
+    consumeLimit(`login:ip:${req.ip}`, 40, 10 * 60_000);
+    const result = await authService.login(phone, password, metadata(req));
     setRefreshCookie(res, result.refreshToken, result.refreshExpiresIn);
     res.json(success({ accessToken: result.accessToken, expiresIn: result.expiresIn, user: result.user }, '登录成功'));
   } catch (caught) {
-    const retryAfter = (caught as { retryAfter?: number }).retryAfter;
-    if (retryAfter) {
-      res.setHeader('Retry-After', retryAfter);
-      res.status(429).json(error('验证码尝试过于频繁，请稍后再试', 429));
-      return;
-    }
     sendAuthError(res, caught, '登录失败');
   }
 });
@@ -140,4 +152,3 @@ authRouter.post('/logout-all', requireAuth, async (req, res) => {
   clearRefreshCookie(res);
   res.json(success(null, '已退出所有设备'));
 });
-

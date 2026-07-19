@@ -120,13 +120,13 @@ export interface CreationDetail extends CommunityCreation {
 }
 
 export async function getBookList(page = 1): Promise<{
-  list: { id: number; title: string; author: string }[];
+  list: { id: number; title: string; author: string; description: string | null; summary: string | null }[];
   totalPages: number;
   currentPage: number;
   totalCount: number;
 }> {
   const response = await client.get<ApiResponse<{
-    list: { id: number; title: string; author: string }[];
+    list: { id: number; title: string; author: string; description: string | null; summary: string | null }[];
     totalPages: number;
     currentPage: number;
     totalCount: number;
@@ -138,13 +138,15 @@ export async function getBookContent(id: number): Promise<{
   title: string;
   author: string;
   content: string;
-  annotations: string[];
+  annotations: { index: number; content: string }[];
+  characters: { id: number; name: string; description: string | null }[];
 }> {
   const response = await client.get<ApiResponse<{
     title: string;
     author: string;
     content: string;
-    annotations: string[];
+    annotations: { index: number; content: string }[];
+    characters: { id: number; name: string; description: string | null }[];
   }>>(`/books/${id}/content`);
   return unwrap(response.data, '获取书籍内容失败');
 }
@@ -167,16 +169,24 @@ export async function adaptBook(
   return unwrap(response.data, '生成内容失败').adaptedContent;
 }
 
-export async function sendSmsCode(phone: string): Promise<{ retryAfter: number }> {
-  const response = await client.post<ApiResponse<{ retryAfter: number }>>('/auth/sms/send', { phone });
-  return unwrap(response.data, '验证码发送失败');
-}
-
-export async function verifySmsCode(phone: string, code: string): Promise<AuthSession> {
-  const response = await client.post<ApiResponse<AuthSession>>('/auth/sms/verify', { phone, code });
+async function authenticate(path: '/auth/login' | '/auth/register', phone: string, password: string, code?: string): Promise<AuthSession> {
+  const response = await client.post<ApiResponse<AuthSession>>(path, { phone, password, ...(code ? { code } : {}) });
   const session = unwrap(response.data, '登录失败');
   setAccessToken(session.accessToken);
   return session;
+}
+
+export function login(phone: string, password: string): Promise<AuthSession> {
+  return authenticate('/auth/login', phone, password);
+}
+
+export async function sendRegistrationCode(phone: string): Promise<{ retryAfter: number }> {
+  const response = await client.post<ApiResponse<{ retryAfter: number }>>('/auth/register/code', { phone });
+  return unwrap(response.data, '验证码发送失败');
+}
+
+export function register(phone: string, password: string, code: string): Promise<AuthSession> {
+  return authenticate('/auth/register', phone, password, code);
 }
 
 export async function refreshAuth(): Promise<AuthSession> {

@@ -65,6 +65,7 @@ model Annotation {
 model User {
   id              Int              @id @default(autoincrement())
   phone           String           @unique
+  passwordHash    String?
   phoneVerifiedAt DateTime?
   status          String           @default("active")
   creations       Creation[]

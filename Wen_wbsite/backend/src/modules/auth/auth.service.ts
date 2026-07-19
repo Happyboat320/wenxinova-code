@@ -1,5 +1,6 @@
 import prisma from '../../lib/prisma.js';
 import type { RefreshSession } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { checkVerifyCode, sendVerifyCode } from './aliyun-sms.service.js';
 import { AuthError, type PublicUser, type RequestMetadata } from './auth.types.js';
 import {
@@ -12,6 +13,8 @@ import {
 
 export const PHONE_PATTERN = /^1[3-9]\d{9}$/;
 export const CODE_PATTERN = /^\d{4,8}$/;
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_BYTES = 72;
 
 export function toPublicUser(user: PublicUser): PublicUser {
   return {
@@ -24,7 +27,11 @@ export function toPublicUser(user: PublicUser): PublicUser {
   };
 }
 
-export async function sendSms(phone: string): Promise<void> {
+export function isValidPassword(password: string): boolean {
+  return password.length >= PASSWORD_MIN_LENGTH && Buffer.byteLength(password, 'utf8') <= PASSWORD_MAX_BYTES;
+}
+
+export async function sendRegistrationCode(phone: string): Promise<void> {
   await sendVerifyCode(phone);
 }
 
@@ -44,24 +51,45 @@ async function createSession(userId: number, metadata: RequestMetadata) {
   return refresh;
 }
 
-export async function verifySmsAndLogin(phone: string, code: string, metadata: RequestMetadata) {
-  const verified = await checkVerifyCode(phone, code);
-  if (!verified) throw new AuthError('验证码错误或已过期', 400, 'INVALID_SMS_CODE');
-
-  const now = new Date();
-  const user = await prisma.user.upsert({
-    where: { phone },
-    update: { phoneVerifiedAt: now },
-    create: { phone, phoneVerifiedAt: now },
-  });
+async function issueSession(user: PublicUser, metadata: RequestMetadata) {
   if (user.status !== 'active') throw new AuthError('账号已停用', 403, 'USER_DISABLED');
-
   const [access, refresh] = await Promise.all([
     Promise.resolve(signAccessToken(user.id)),
     createSession(user.id, metadata),
   ]);
-  console.info(`短信登录成功: ${phone.slice(0, 3)}****${phone.slice(-4)}`);
   return { accessToken: access.token, expiresIn: access.expiresIn, refreshToken: refresh.token, refreshExpiresIn: refresh.expiresIn, user: toPublicUser(user) };
+}
+
+export async function register(phone: string, password: string, code: string, metadata: RequestMetadata) {
+  const verified = await checkVerifyCode(phone, code);
+  if (!verified) throw new AuthError('验证码错误或已过期', 400, 'INVALID_SMS_CODE');
+
+  const existing = await prisma.user.findUnique({ where: { phone } });
+  if (existing?.passwordHash) throw new AuthError('该手机号已注册，请直接登录', 409, 'PHONE_REGISTERED');
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  try {
+    const now = new Date();
+    const user = existing
+      ? await prisma.user.update({ where: { id: existing.id }, data: { passwordHash, phoneVerifiedAt: now } })
+      : await prisma.user.create({ data: { phone, passwordHash, phoneVerifiedAt: now } });
+    if (existing) await prisma.refreshSession.updateMany({ where: { userId: existing.id, revokedAt: null }, data: { revokedAt: now } });
+    console.info(`密码注册成功: ${phone.slice(0, 3)}****${phone.slice(-4)}`);
+    return await issueSession(user, metadata);
+  } catch (caught) {
+    if ((caught as { code?: string }).code === 'P2002') {
+      throw new AuthError('该手机号已注册，请直接登录', 409, 'PHONE_REGISTERED');
+    }
+    throw caught;
+  }
+}
+
+export async function login(phone: string, password: string, metadata: RequestMetadata) {
+  const user = await prisma.user.findUnique({ where: { phone } });
+  const passwordMatches = user?.passwordHash ? await bcrypt.compare(password, user.passwordHash) : false;
+  if (!user || !passwordMatches) throw new AuthError('手机号或密码错误', 401, 'INVALID_CREDENTIALS');
+  console.info(`密码登录成功: ${phone.slice(0, 3)}****${phone.slice(-4)}`);
+  return issueSession(user, metadata);
 }
 
 async function revokeChain(sessionId: string): Promise<void> {
@@ -89,7 +117,7 @@ export async function refreshSession(rawToken: string, metadata: RequestMetadata
   if (current.revokedAt) {
     await revokeChain(current.id);
     console.warn(`检测到 Refresh Token 重放，会话 ${current.id} 已撤销`);
-    throw new AuthError('检测到异常登录，请重新验证手机号', 401, 'REFRESH_REUSED');
+    throw new AuthError('检测到异常登录，请重新登录', 401, 'REFRESH_REUSED');
   }
   if (current.expiresAt <= new Date() || current.user.status !== 'active') {
     await prisma.refreshSession.updateMany({ where: { id: current.id }, data: { revokedAt: new Date() } });
@@ -104,7 +132,7 @@ export async function refreshSession(rawToken: string, metadata: RequestMetadata
         where: { id: current.id, tokenHash, revokedAt: null },
         data: { revokedAt: new Date(), replacedById: nextSessionId, lastUsedAt: new Date() },
       });
-      if (updated.count !== 1) throw new AuthError('检测到异常登录，请重新验证手机号', 401, 'REFRESH_REUSED');
+      if (updated.count !== 1) throw new AuthError('检测到异常登录，请重新登录', 401, 'REFRESH_REUSED');
       await tx.refreshSession.create({
         data: {
           id: nextSessionId,

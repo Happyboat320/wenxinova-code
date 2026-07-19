@@ -20,6 +20,8 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+/backend.env.before-https
+/nginx.before-https/
 
 # Runtime/import data and local databases
 data/

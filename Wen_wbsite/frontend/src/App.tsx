@@ -10,7 +10,7 @@ import { AuthContext } from '@/contexts/authContext';
 import { Toaster } from 'sonner';
 import type { User } from '@/api';
 import * as api from '@/api';
-import SmsLoginModal from '@/components/SmsLoginModal';
+import AuthModal from '@/components/AuthModal';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -55,7 +55,7 @@ function App() {
         <Route path="/my-collection" element={<MyCollectionPage />} />
       </Routes>
       <Toaster />
-      <SmsLoginModal
+      <AuthModal
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
         onAuthenticated={session => setUser(session.user)}
