@@ -29,13 +29,12 @@ describe('文库实际数据分类', () => {
     ]);
 
     await expect(getBookCategories()).resolves.toEqual([
-      { value: UNCATEGORIZED_VALUE, label: '未分类', count: 12 },
-      { value: '散文', label: '散文', count: 3790 },
       { value: '笔记小说', label: '笔记小说', count: 20054 },
+      { value: '散文', label: '散文', count: 3790 },
+      { value: UNCATEGORIZED_VALUE, label: '未分类', count: 12 },
     ]);
     expect(bookMock.groupBy).toHaveBeenCalledWith(expect.objectContaining({
       by: ['category'],
-      orderBy: { category: 'asc' },
     }));
   });
 

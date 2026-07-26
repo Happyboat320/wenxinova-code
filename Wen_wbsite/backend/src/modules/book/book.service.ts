@@ -90,14 +90,19 @@ export async function getBookCategories() {
   const groups = await prisma.book.groupBy({
     by: ['category'],
     _count: { _all: true },
-    orderBy: { category: 'asc' },
   });
 
-  return groups.map(group => ({
-    value: group.category || UNCATEGORIZED_VALUE,
-    label: group.category || '未分类',
-    count: group._count._all,
-  }));
+  return groups
+    // 使用 _all 才能让 category 为空的“未分类”也按真实数量参与排序。
+    .sort((left, right) => (
+      right._count._all - left._count._all
+      || (left.category || '未分类').localeCompare(right.category || '未分类', 'zh-CN')
+    ))
+    .map(group => ({
+      value: group.category || UNCATEGORIZED_VALUE,
+      label: group.category || '未分类',
+      count: group._count._all,
+    }));
 }
 
 // 获取书籍译文
