@@ -3,7 +3,16 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
 import { AuthContext } from '@/contexts/authContext';
+import MarkdownContent from '@/components/MarkdownContent';
 import * as api from '@/api';
+
+const categoryLabels: Record<api.CreationCategory, string> = {
+  adaptation: '改编',
+  script: '剧本杀',
+  props: '道具',
+  dm: 'DM 手册',
+  other: '其他',
+};
 
 const MyCollectionPage = () => {
   const { isDark } = useTheme();
@@ -70,11 +79,16 @@ const MyCollectionPage = () => {
           {creations.map(creation => (
             <article key={creation.id} className={`rounded-xl p-6 shadow-md border border-amber-100 ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="flex justify-between gap-4 mb-3">
-                <h3 className="text-xl font-semibold">{creation.book?.title || '自由创作'}</h3>
+                <div>
+                  <span className="mb-2 inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-800">{categoryLabels[creation.category] || '其他'}</span>
+                  <h3 className="text-xl font-semibold">{creation.book?.title || '自由创作'}</h3>
+                </div>
                 <time className="text-xs opacity-60 whitespace-nowrap">{new Date(creation.createdAt).toLocaleString('zh-CN')}</time>
               </div>
               <p className="text-sm text-amber-700 mb-3 break-words">{creation.prompt}</p>
-              <p className="whitespace-pre-wrap line-clamp-6 leading-relaxed">{creation.content}</p>
+              <div className="max-h-64 overflow-hidden">
+                <MarkdownContent content={creation.content} className={isDark ? '!text-gray-100' : ''} />
+              </div>
               {creation.bookId && (
                 <Link to={`/book/${creation.bookId}`} className="inline-block mt-4 text-amber-700 hover:underline">查看原书 →</Link>
               )}

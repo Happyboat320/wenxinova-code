@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AuthContext } from '@/contexts/authContext';
+import MarkdownContent from '@/components/MarkdownContent';
 import * as api from '@/api';
 
 interface Character {
@@ -69,6 +70,11 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
     return { type: 'custom' as const, prompt: scriptSectionCopy[scriptSection].prompt };
   }, [mode, scriptSection, selectedCharacter, style, styleRequirement]);
 
+  // 保存独立分类，避免社区再根据可变的提示词内容猜测类型。
+  const creationCategory: api.CreationCategory = mode === 'style'
+    ? 'adaptation'
+    : scriptSection === 'role' ? 'script' : scriptSection;
+
   const generate = async () => {
     if (!user) {
       toast.error('请先登录后使用 AI 创作');
@@ -126,7 +132,7 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
     if (!result.trim()) return;
     try {
       setSaving(true);
-      await api.saveCreation({ bookId, prompt: `[${request.type}] ${request.prompt}`, content: result });
+      await api.saveCreation({ bookId, category: creationCategory, prompt: request.prompt, content: result });
       toast.success('已保存到“我的创作”，并展示在社区');
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : '保存失败');
@@ -218,5 +224,27 @@ function OriginalPanel({ className, text }: { className: string; text: string })
 }
 
 function OutputPanel({ className, title, result, onChange, loading, onGenerate }: { className: string; title: string; result: string; onChange: (value: string) => void; loading: boolean; onGenerate: () => void }) {
-  return <section className={`${className} p-6`}><div className="mb-4 flex items-center justify-between gap-4"><h3 className="text-xl font-medium"><i className="fa-solid fa-pen-to-square mr-2 text-amber-700" />{title}</h3><button onClick={onGenerate} disabled={loading} className="btn-secondary disabled:opacity-50"><i className="fa-solid fa-wand-magic-sparkles mr-2" />{loading ? '生成中...' : '生成内容'}</button></div><textarea value={result} onChange={event => onChange(event.target.value)} className="h-[620px] w-full resize-none rounded-lg border border-gray-200 p-5 leading-8 focus:outline-none focus:ring-2 focus:ring-amber-400" placeholder={loading ? 'AI 正在创作，请稍候…' : '生成的内容将显示在这里，生成后可以继续编辑…'} /></section>;
+  const [preview, setPreview] = useState(false);
+
+  return (
+    <section className={`${className} p-6`}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-xl font-medium"><i className="fa-solid fa-pen-to-square mr-2 text-amber-700" />{title}</h3>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-lg border border-amber-200 bg-amber-50 p-1 text-sm">
+            <button onClick={() => setPreview(false)} className={`rounded-md px-3 py-1.5 ${!preview ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>编辑</button>
+            <button onClick={() => setPreview(true)} className={`rounded-md px-3 py-1.5 ${preview ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>预览</button>
+          </div>
+          <button onClick={onGenerate} disabled={loading} className="btn-secondary disabled:opacity-50"><i className="fa-solid fa-wand-magic-sparkles mr-2" />{loading ? '生成中...' : '生成内容'}</button>
+        </div>
+      </div>
+      {preview ? (
+        <div className="h-[620px] overflow-y-auto rounded-lg border border-gray-200 p-5">
+          {result.trim() ? <MarkdownContent content={result} /> : <p className="text-gray-400">生成内容后可在这里预览 Markdown 排版效果。</p>}
+        </div>
+      ) : (
+        <textarea value={result} onChange={event => onChange(event.target.value)} className="h-[620px] w-full resize-none rounded-lg border border-gray-200 p-5 leading-8 focus:outline-none focus:ring-2 focus:ring-amber-400" placeholder={loading ? 'AI 正在创作，请稍候…' : '生成的内容将显示在这里，生成后可以继续编辑…'} />
+      )}
+    </section>
+  );
 }

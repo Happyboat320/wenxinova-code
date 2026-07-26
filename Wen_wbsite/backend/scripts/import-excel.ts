@@ -8,7 +8,8 @@
  *   3. 或者: npm run import:excel
  *
  * Excel 格式要求:
- *   列名: 序号, 篇名, 年代, 作者, 注释数目, 类别, 主题, 人物, 关键词, 梗概
+ *   列名: 序号, 篇名, 年代, 作者, 注释数目, 题材体裁, 主题, 人物, 关键词, 梗概
+ *   为兼容旧模板，“类别”列仍可作为“题材体裁”的备用列名。
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -25,6 +26,7 @@ interface ExcelRow {
   年代?: string;
   作者?: string;
   注释数目?: number | string;
+  题材体裁?: string;
   类别?: string;
   主题?: string;
   人物?: string;
@@ -132,7 +134,8 @@ function transformRow(row: ExcelRow) {
 
   const author = cleanSingleLine(row.作者) || '佚名';
   const dynasty = toNullable(cleanSingleLine(row.年代));
-  const category = toNullable(cleanSingleLine(row.类别));
+  // 新模板使用“题材体裁”，旧模板中的“类别”仍可继续导入。
+  const category = toNullable(cleanSingleLine(row.题材体裁 || row.类别));
   const theme = toNullable(cleanSingleLine(row.主题));
   const mainCharacters = toNullable(cleanSingleLine(row.人物));
   const keywords = toNullable(cleanSingleLine(row.关键词));

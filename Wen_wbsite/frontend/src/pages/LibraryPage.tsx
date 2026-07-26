@@ -8,6 +8,7 @@ type Book = {
   id: number;
   title: string;
   author: string;
+  category: string | null;
   description: string | null;
   summary: string | null;
 };
@@ -17,6 +18,8 @@ const LibraryPage = () => {
   const navigate = useNavigate();
 
   const [books, setBooks] = useState<Book[]>([]);
+  const [categories, setCategories] = useState<api.CategoryOption[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -24,13 +27,17 @@ const LibraryPage = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    api.getBookCategories()
+      .then(setCategories)
+      .catch(err => setError(err instanceof Error ? err.message : '获取书籍分类失败'));
+  }, []);
+
+  useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        console.log('开始获取书籍列表...');
-        const data = await api.getBookList(currentPage);
-        console.log('获取到的书籍数据:', data);
+        const data = await api.getBookList(currentPage, selectedCategory || undefined);
         setBooks(data.list);
         setTotalPages(data.totalPages);
         setTotalCount(data.totalCount);
@@ -42,7 +49,12 @@ const LibraryPage = () => {
       }
     };
     load();
-  }, [currentPage]);
+  }, [currentPage, selectedCategory]);
+
+  const changeCategory = (category: string) => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+  };
 
   // 页面容器动画变体
   const containerVariants = {
@@ -89,8 +101,50 @@ const LibraryPage = () => {
           <p className="mt-2 text-sm opacity-60">共 {totalCount.toLocaleString()} 部作品</p>
         </div>
 
+        {/* 题材体裁作为文库一级分类；切换分类时分页会自动回到第一页。 */}
+        <div className={`mx-auto mb-9 max-w-6xl rounded-xl border border-amber-200 p-5 shadow-sm ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+          <div className="mb-4 flex items-center gap-2 font-medium text-amber-800">
+            <i className="fa-solid fa-layer-group" />
+            <span>题材体裁</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-9" aria-label="文库题材体裁分类">
+            <button
+              type="button"
+              aria-pressed={selectedCategory === ''}
+              onClick={() => changeCategory('')}
+              className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                selectedCategory === ''
+                  ? 'border-amber-700 bg-amber-700 text-white'
+                  : isDark ? 'border-gray-600 hover:border-amber-500' : 'border-amber-200 hover:bg-amber-50'
+              }`}
+            >
+              全部
+            </button>
+            {categories.map(category => (
+              <button
+                type="button"
+                key={category.value}
+                aria-pressed={selectedCategory === category.value}
+                onClick={() => changeCategory(category.value)}
+                className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  selectedCategory === category.value
+                    ? 'border-amber-700 bg-amber-700 text-white'
+                    : isDark ? 'border-gray-600 hover:border-amber-500' : 'border-amber-200 hover:bg-amber-50'
+                }`}
+              >
+                <span className="block whitespace-nowrap">{category.label}</span>
+                <span className="mt-0.5 block text-xs opacity-70">{category.count.toLocaleString()} 部</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {loading && <div className="text-center">加载中...</div>}
         {error && <div className="text-center text-red-500">{error}</div>}
+
+        {!loading && !error && books.length === 0 && (
+          <div className="py-16 text-center opacity-70">该分类暂无作品</div>
+        )}
 
         <motion.div
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto"
@@ -116,6 +170,7 @@ const LibraryPage = () => {
                   <h3 className="text-2xl font-bold mb-1">{book.title}</h3>
                   <p className="text-sm opacity-90">作者：{book.author}</p>
                 </div>
+                <span className="absolute right-4 top-4 rounded-full bg-black/55 px-3 py-1 text-xs text-white backdrop-blur-sm">{book.category || '未分类'}</span>
               </div>
 
               <div className="p-6">

@@ -98,16 +98,26 @@ export interface Creation {
   id: number;
   userId: number;
   bookId: number | null;
+  category: CreationCategory;
   prompt: string;
   content: string;
   createdAt: string;
   book?: { title: string } | null;
 }
 
+export type CreationCategory = 'adaptation' | 'script' | 'props' | 'dm' | 'other';
+
+export interface CategoryOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
 export interface CommunityCreation {
   id: number;
   userId: number;
   bookId: number | null;
+  category: CreationCategory;
   prompt: string;
   createdAt: string;
   user: { phone: string };
@@ -119,19 +129,24 @@ export interface CreationDetail extends CommunityCreation {
   book: { title: string; author: string } | null;
 }
 
-export async function getBookList(page = 1): Promise<{
-  list: { id: number; title: string; author: string; description: string | null; summary: string | null }[];
+export async function getBookList(page = 1, category?: string): Promise<{
+  list: { id: number; title: string; author: string; category: string | null; description: string | null; summary: string | null }[];
   totalPages: number;
   currentPage: number;
   totalCount: number;
 }> {
   const response = await client.get<ApiResponse<{
-    list: { id: number; title: string; author: string; description: string | null; summary: string | null }[];
+    list: { id: number; title: string; author: string; category: string | null; description: string | null; summary: string | null }[];
     totalPages: number;
     currentPage: number;
     totalCount: number;
-  }>>('/books', { params: { page } });
+  }>>('/books', { params: { page, category } });
   return unwrap(response.data, '获取书籍列表失败');
+}
+
+export async function getBookCategories(): Promise<CategoryOption[]> {
+  const response = await client.get<ApiResponse<CategoryOption[]>>('/books/categories');
+  return unwrap(response.data, '获取书籍分类失败');
 }
 
 export async function getBookContent(id: number): Promise<{
@@ -215,6 +230,7 @@ export async function logout(): Promise<void> {
 
 export async function saveCreation(data: {
   bookId?: number;
+  category: CreationCategory;
   prompt: string;
   content: string;
 }): Promise<Creation> {
@@ -227,11 +243,28 @@ export async function getUserCreations(): Promise<Creation[]> {
   return unwrap(response.data, '获取创作历史失败');
 }
 
-export async function getCommunityCreations(limit = 20): Promise<CommunityCreation[]> {
-  const response = await client.get<ApiResponse<CommunityCreation[]>>('/community/creations', {
-    params: { limit },
+export async function getCommunityCreations(page = 1, category?: CreationCategory): Promise<{
+  list: CommunityCreation[];
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  pageSize: number;
+}> {
+  const response = await client.get<ApiResponse<{
+    list: CommunityCreation[];
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    pageSize: number;
+  }>>('/community/creations', {
+    params: { page, category },
   });
   return unwrap(response.data, '获取社区列表失败');
+}
+
+export async function getCommunityCategories(): Promise<Array<CategoryOption & { value: CreationCategory }>> {
+  const response = await client.get<ApiResponse<Array<CategoryOption & { value: CreationCategory }>>>('/community/categories');
+  return unwrap(response.data, '获取社区分类失败');
 }
 
 export async function getCreationDetail(id: number): Promise<CreationDetail> {

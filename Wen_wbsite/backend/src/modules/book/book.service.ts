@@ -1,10 +1,29 @@
 import prisma from '../../lib/prisma.js';
 import * as deepseek from '../../lib/deepseek.js';
 
-// 获取书籍列表
-export async function getBookList(page: number = 1) {
+// 文库只提供产品约定的八个“题材体裁”一级分类，避免把数据库中的其他文体混入导航。
+export const BOOK_CATEGORIES = [
+  '传奇',
+  '神怪小说',
+  '话本',
+  '拟话本',
+  '笔记小说',
+  '公案小说',
+  '世情小说',
+  '历史演义',
+] as const;
+
+export type BookCategory = (typeof BOOK_CATEGORIES)[number];
+
+export function isBookCategory(value: unknown): value is BookCategory {
+  return typeof value === 'string' && BOOK_CATEGORIES.some(category => category === value);
+}
+
+// 获取书籍列表；分类条件必须同时用于列表和总数，保证分页统计一致。
+export async function getBookList(page: number = 1, category?: BookCategory) {
   const pageSize = 9;
   const skip = (page - 1) * pageSize;
+  const where = category ? { category } : {};
 
   const [books, total] = await Promise.all([
     prisma.book.findMany({
@@ -12,14 +31,16 @@ export async function getBookList(page: number = 1) {
         id: true,
         title: true,
         author: true,
+        category: true,
         description: true,
         summary: true,
       },
+      where,
       orderBy: { id: 'asc' },
       skip,
       take: pageSize,
     }),
-    prisma.book.count(),
+    prisma.book.count({ where }),
   ]);
 
   const totalPages = Math.ceil(total / pageSize);
@@ -76,6 +97,22 @@ export async function getBookContent(id: number) {
           .map((name, index) => ({ id: -(index + 1), name: name.trim(), description: null }))
           .filter(character => character.name),
   };
+}
+
+// 即使某个分类暂时没有作品也要返回，确保前端始终完整展示八个一级分类。
+export async function getBookCategories() {
+  const groups = await prisma.book.groupBy({
+    by: ['category'],
+    _count: { _all: true },
+    where: { category: { in: [...BOOK_CATEGORIES] } },
+  });
+
+  const counts = new Map(groups.map(group => [group.category, group._count._all]));
+  return BOOK_CATEGORIES.map(category => ({
+    value: category,
+    label: category,
+    count: counts.get(category) || 0,
+  }));
 }
 
 // 获取书籍译文

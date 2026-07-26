@@ -2,19 +2,24 @@ import { Router, Request, Response } from 'express';
 import * as userService from './user.service.js';
 import { success, error } from '../../lib/response.js';
 import { requireAuth } from '../auth/auth.middleware.js';
+import { isCreationCategory } from '../community/community.types.js';
 
 export const userRouter = Router();
 
 // 保存创作
 userRouter.post('/creation', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { bookId, prompt, content } = req.body;
+    const { bookId, category = 'other', prompt, content } = req.body;
     if (typeof prompt !== 'string' || !prompt.trim() || typeof content !== 'string' || !content.trim()) {
       return res.status(400).json(error('参数不完整'));
+    }
+    if (!isCreationCategory(category)) {
+      return res.status(400).json(error('无效的创作分类', 400));
     }
     const creation = await userService.saveCreation({
       userId: req.auth!.userId,
       bookId: bookId ? Number(bookId) : undefined,
+      category,
       prompt: prompt.trim(),
       content: content.trim(),
     });

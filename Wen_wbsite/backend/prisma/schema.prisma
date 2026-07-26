@@ -18,7 +18,7 @@ model Book {
   dynasty        String?  // 年代（唐、宋等）
   description    String?
   image          String?
-  category       String?  // 类别（传奇等）
+  category       String?  // 题材体裁（传奇、话本等）
   theme          String?  // 主题
   mainCharacters String?  // 主要人物
   keywords       String?  // 关键词
@@ -98,6 +98,7 @@ model Creation {
   id        Int      @id @default(autoincrement())
   userId    Int
   bookId    Int?
+  category  String   @default("other") // 社区分类：adaptation/script/props/dm/other
   prompt    String   // 提示词
   content   String   // 生成的内容
   createdAt DateTime @default(now())
@@ -105,4 +106,6 @@ model Creation {
   // 关联
   user User @relation(fields: [userId], references: [id])
   book Book? @relation(fields: [bookId], references: [id])
+
+  @@index([category, createdAt])
 }

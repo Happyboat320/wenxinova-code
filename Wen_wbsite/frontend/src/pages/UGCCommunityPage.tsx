@@ -2,23 +2,37 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
+import MarkdownContent from '@/components/MarkdownContent';
 import * as api from '@/api';
 
 const UGCCommunityPage = () => {
   const { isDark } = useTheme();
   const [creations, setCreations] = useState<api.CommunityCreation[]>([]);
+  const [categories, setCategories] = useState<Array<api.CategoryOption & { value: api.CreationCategory }>>([]);
+  const [selectedCategory, setSelectedCategory] = useState<api.CreationCategory | ''>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const [detail, setDetail] = useState<api.CreationDetail | null>(null);
-  const [limit, setLimit] = useState(20);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getCommunityCategories()
+      .then(setCategories)
+      .catch(requestError => setError(requestError instanceof Error ? requestError.message : '获取社区分类失败'));
+  }, []);
 
   useEffect(() => {
     const loadCreations = async () => {
       try {
         setLoading(true);
         setError(null);
-        setCreations(await api.getCommunityCreations(limit));
+        const data = await api.getCommunityCreations(currentPage, selectedCategory || undefined);
+        setCreations(data.list);
+        setTotalPages(data.totalPages);
+        setTotalCount(data.totalCount);
       } catch (requestError) {
         setError(requestError instanceof Error ? requestError.message : '获取社区列表失败');
       } finally {
@@ -26,10 +40,16 @@ const UGCCommunityPage = () => {
       }
     };
     loadCreations();
-  }, [limit]);
+  }, [currentPage, selectedCategory]);
+
+  const changeCategory = (category: api.CreationCategory | '') => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+  };
 
   const openDetail = async (id: number) => {
     try {
+      setDetail(null);
       setDetailLoading(true);
       setDetail(await api.getCreationDetail(id));
     } catch (requestError) {
@@ -39,74 +59,108 @@ const UGCCommunityPage = () => {
     }
   };
 
+  const categoryLabel = (value: api.CreationCategory) => categories.find(category => category.value === value)?.label || '其他';
+
   return (
     <div className={`min-h-screen p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
-      <header className="mb-12 flex justify-between items-center">
+      <header className="mb-12 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <i className="fa-solid fa-book-open text-amber-800 text-2xl" />
-          <h1 className="text-2xl title-serif">文心新述</h1>
+          <i className="fa-solid fa-book-open text-2xl text-amber-800" />
+          <h1 className="title-serif text-2xl">文心新述</h1>
         </div>
         <nav className="flex gap-6">
           <Link to="/" className="hover:text-amber-700">首页</Link>
           <Link to="/classical-library" className="hover:text-amber-700">古典文库</Link>
-          <Link to="/ugc-community" className="font-medium text-amber-800 border-b-2 border-amber-800 pb-1">UGC社区</Link>
+          <Link to="/ugc-community" className="border-b-2 border-amber-800 pb-1 font-medium text-amber-800">UGC社区</Link>
           <Link to="/my-collection" className="hover:text-amber-700">我的创作</Link>
         </nav>
       </header>
 
-      <main className="max-w-6xl mx-auto">
-        <div className="mb-10 text-center">
-          <h2 className="text-4xl title-serif mb-4">灵盛广场</h2>
-          <p className="text-lg opacity-80">浏览用户最新保存的 AI 创作作品</p>
+      <main className="mx-auto max-w-6xl">
+        <div className="mb-8 text-center">
+          <h2 className="title-serif mb-4 text-4xl">灵盛广场</h2>
+          <p className="text-lg opacity-80">按创作类型浏览用户发布的 AI 作品</p>
+          <p className="mt-2 text-sm opacity-60">当前分类共 {totalCount.toLocaleString()} 篇</p>
         </div>
 
-        {loading && <div className="text-center py-16">加载中...</div>}
-        {error && <div className="text-center py-8 text-red-600">{error}</div>}
-        {!loading && !error && creations.length === 0 && (
-          <div className="bg-white rounded-xl p-10 text-center shadow">社区暂时没有作品，完成改编后保存即可发布。</div>
-        )}
-
-        <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          {creations.map(creation => (
+        <div className="mb-9 flex flex-wrap justify-center gap-3" aria-label="社区作品分类">
+          <button
+            onClick={() => changeCategory('')}
+            className={`rounded-full border px-5 py-2 transition ${selectedCategory === '' ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-200 bg-white text-amber-800 hover:bg-amber-50'}`}
+          >
+            全部
+          </button>
+          {categories.map(category => (
             <button
-              key={creation.id}
-              onClick={() => openDetail(creation.id)}
-              className={`text-left rounded-xl p-6 border border-amber-100 shadow-md hover:shadow-lg transition ${isDark ? 'bg-gray-800' : 'bg-white'}`}
+              key={category.value}
+              onClick={() => changeCategory(category.value)}
+              className={`rounded-full border px-5 py-2 transition ${selectedCategory === category.value ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-200 bg-white text-amber-800 hover:bg-amber-50'}`}
             >
-              <div className="flex justify-between gap-4 mb-3">
-                <h3 className="text-xl font-bold">{creation.book?.title || '自由创作'}</h3>
-                <span className="text-xs opacity-60">{new Date(creation.createdAt).toLocaleDateString('zh-CN')}</span>
-              </div>
-              <p className="line-clamp-3 mb-5">{creation.prompt}</p>
-              <div className="flex justify-between text-sm opacity-70">
-                <span>用户 {creation.user.phone}</span>
-                <span>查看全文 →</span>
-              </div>
+              {category.label} <span className="ml-1 opacity-70">{category.count}</span>
             </button>
           ))}
-        </motion.div>
+        </div>
 
-        {creations.length >= limit && (
-          <div className="mt-10 text-center">
-            <button onClick={() => setLimit(value => value + 20)} disabled={loading} className="btn-secondary">加载更多作品</button>
+        {loading && <div className="py-16 text-center">加载中...</div>}
+        {error && <div className="py-8 text-center text-red-600">{error}</div>}
+        {!loading && !error && creations.length === 0 && (
+          <div className="rounded-xl bg-white p-10 text-center text-gray-800 shadow">当前分类暂时没有作品，完成创作后保存即可发布。</div>
+        )}
+
+        {!loading && !error && (
+          <motion.div className="grid grid-cols-1 gap-6 md:grid-cols-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            {creations.map(creation => (
+              <button
+                key={creation.id}
+                onClick={() => openDetail(creation.id)}
+                className={`rounded-xl border border-amber-100 p-6 text-left shadow-md transition hover:shadow-lg ${isDark ? 'bg-gray-800' : 'bg-white'}`}
+              >
+                <div className="mb-3 flex justify-between gap-4">
+                  <div>
+                    <span className="mb-2 inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-800">{categoryLabel(creation.category)}</span>
+                    <h3 className="text-xl font-bold">{creation.book?.title || '自由创作'}</h3>
+                  </div>
+                  <span className="text-xs opacity-60">{new Date(creation.createdAt).toLocaleDateString('zh-CN')}</span>
+                </div>
+                <p className="mb-5 line-clamp-3">{creation.prompt}</p>
+                <div className="flex justify-between text-sm opacity-70">
+                  <span>用户 {creation.user.phone}</span>
+                  <span>查看全文 →</span>
+                </div>
+              </button>
+            ))}
+          </motion.div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+            <button className="btn-secondary disabled:cursor-not-allowed disabled:opacity-40" disabled={currentPage === 1 || loading} onClick={() => setCurrentPage(page => page - 1)}>上一页</button>
+            {Array.from({ length: Math.min(7, totalPages) }, (_, index) => {
+              const start = Math.min(Math.max(currentPage - 3, 1), Math.max(totalPages - 6, 1));
+              const page = start + index;
+              return <button key={page} disabled={loading} onClick={() => setCurrentPage(page)} className={`min-w-10 rounded-lg border px-3 py-2 ${page === currentPage ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-200 bg-white text-amber-800'}`}>{page}</button>;
+            })}
+            <button className="btn-secondary disabled:cursor-not-allowed disabled:opacity-40" disabled={currentPage === totalPages || loading} onClick={() => setCurrentPage(page => page + 1)}>下一页</button>
+            <span className="ml-2 text-sm opacity-70">第 {currentPage} / {totalPages} 页</span>
           </div>
         )}
       </main>
 
       {(detail || detailLoading) && (
-        <div className="fixed inset-0 z-50 bg-black/60 p-6 flex items-center justify-center" onClick={() => setDetail(null)}>
-          <div className="bg-white text-gray-800 rounded-2xl p-8 w-full max-w-3xl max-h-[85vh] overflow-y-auto shadow-2xl" onClick={event => event.stopPropagation()}>
-            {detailLoading && !detail ? <div className="text-center py-16">加载中...</div> : detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => setDetail(null)}>
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-8 text-gray-800 shadow-2xl" onClick={event => event.stopPropagation()}>
+            {detailLoading ? <div className="py-16 text-center">加载中...</div> : detail && (
               <>
-                <div className="flex justify-between gap-4 mb-5">
+                <div className="mb-5 flex justify-between gap-4">
                   <div>
+                    <span className="mb-2 inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-800">{categoryLabel(detail.category)}</span>
                     <h3 className="text-2xl font-bold">{detail.book?.title || '自由创作'}</h3>
-                    <p className="text-sm opacity-60 mt-1">{detail.book?.author || '匿名原作'} · {new Date(detail.createdAt).toLocaleString('zh-CN')}</p>
+                    <p className="mt-1 text-sm opacity-60">{detail.book?.author || '匿名原作'} · {new Date(detail.createdAt).toLocaleString('zh-CN')}</p>
                   </div>
-                  <button onClick={() => setDetail(null)} className="text-2xl opacity-60 hover:opacity-100">×</button>
+                  <button onClick={() => setDetail(null)} className="text-2xl opacity-60 hover:opacity-100" aria-label="关闭">×</button>
                 </div>
-                <div className="bg-amber-50 rounded-lg p-4 mb-5 text-amber-900">创作要求：{detail.prompt}</div>
-                <div className="whitespace-pre-wrap leading-8">{detail.content}</div>
+                <div className="mb-5 rounded-lg bg-amber-50 p-4 text-amber-900">创作要求：{detail.prompt}</div>
+                <MarkdownContent content={detail.content} />
               </>
             )}
           </div>

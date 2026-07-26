@@ -1,4 +1,5 @@
 import prisma from '../../lib/prisma.js';
+import type { CreationCategory } from '../community/community.types.js';
 
 // 创建用户
 export async function createUser(phone: string) {
@@ -33,6 +34,7 @@ export async function login(phone: string) {
 export async function saveCreation(data: {
   userId: number;
   bookId?: number;
+  category: CreationCategory;
   prompt: string;
   content: string;
 }) {
@@ -40,6 +42,7 @@ export async function saveCreation(data: {
     data: {
       userId: data.userId,
       bookId: data.bookId,
+      category: data.category,
       prompt: data.prompt,
       content: data.content,
     },

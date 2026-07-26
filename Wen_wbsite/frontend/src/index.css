@@ -96,3 +96,29 @@ body {
 .book-shadow {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(139, 35, 35, 0.05);
 }
+
+/* AI 与社区正文的 Markdown 排版，不依赖额外的 Typography 插件。 */
+.markdown-content {
+  @apply break-words leading-8 text-gray-800;
+}
+
+.markdown-content > :first-child { margin-top: 0; }
+.markdown-content > :last-child { margin-bottom: 0; }
+.markdown-content h1 { @apply mb-4 mt-7 text-3xl font-bold; }
+.markdown-content h2 { @apply mb-3 mt-6 border-b border-amber-200 pb-2 text-2xl font-bold; }
+.markdown-content h3 { @apply mb-2 mt-5 text-xl font-semibold; }
+.markdown-content h4 { @apply mb-2 mt-4 text-lg font-semibold; }
+.markdown-content p { @apply my-3; }
+.markdown-content ul { @apply my-3 list-disc pl-7; }
+.markdown-content ol { @apply my-3 list-decimal pl-7; }
+.markdown-content li { @apply my-1; }
+.markdown-content blockquote { @apply my-4 border-l-4 border-amber-400 bg-amber-50 px-4 py-2 text-gray-700; }
+.markdown-content a { @apply text-amber-700 underline hover:text-amber-900; }
+.markdown-content code { @apply rounded bg-gray-100 px-1.5 py-0.5 font-mono text-sm text-red-800; }
+.markdown-content pre { @apply my-4 overflow-x-auto rounded-lg bg-gray-900 p-4 text-gray-100; }
+.markdown-content pre code { @apply bg-transparent p-0 text-inherit; }
+.markdown-content table { @apply my-4 w-full border-collapse text-left; }
+.markdown-content th { @apply border border-amber-200 bg-amber-50 px-3 py-2 font-semibold; }
+.markdown-content td { @apply border border-amber-200 px-3 py-2 align-top; }
+.markdown-content hr { @apply my-6 border-amber-200; }
+.markdown-content input[type='checkbox'] { @apply mr-2; }
