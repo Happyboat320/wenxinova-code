@@ -101,42 +101,24 @@ const LibraryPage = () => {
           <p className="mt-2 text-sm opacity-60">共 {totalCount.toLocaleString()} 部作品</p>
         </div>
 
-        {/* 题材体裁作为文库一级分类；切换分类时分页会自动回到第一页。 */}
-        <div className={`mx-auto mb-9 max-w-6xl rounded-xl border border-amber-200 p-5 shadow-sm ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className="mb-4 flex items-center gap-2 font-medium text-amber-800">
-            <i className="fa-solid fa-layer-group" />
-            <span>题材体裁</span>
-          </div>
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-9" aria-label="文库题材体裁分类">
-            <button
-              type="button"
-              aria-pressed={selectedCategory === ''}
-              onClick={() => changeCategory('')}
-              className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                selectedCategory === ''
-                  ? 'border-amber-700 bg-amber-700 text-white'
-                  : isDark ? 'border-gray-600 hover:border-amber-500' : 'border-amber-200 hover:bg-amber-50'
-              }`}
-            >
-              全部
-            </button>
+        {/* 分类来自数据库实际值；类别较多时使用下拉框避免页面被按钮铺满。 */}
+        <div className={`mx-auto mb-9 flex max-w-3xl items-center gap-4 rounded-xl border border-amber-200 p-4 shadow-sm ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+          <label htmlFor="book-category" className="shrink-0 font-medium text-amber-800">
+            <i className="fa-solid fa-layer-group mr-2" />题材体裁
+          </label>
+          <select
+            id="book-category"
+            value={selectedCategory}
+            onChange={event => changeCategory(event.target.value)}
+            className={`min-w-0 flex-1 rounded-lg border border-amber-200 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDark ? 'bg-gray-700 text-gray-100' : 'bg-amber-50/50'}`}
+          >
+            <option value="">全部类别</option>
             {categories.map(category => (
-              <button
-                type="button"
-                key={category.value}
-                aria-pressed={selectedCategory === category.value}
-                onClick={() => changeCategory(category.value)}
-                className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                  selectedCategory === category.value
-                    ? 'border-amber-700 bg-amber-700 text-white'
-                    : isDark ? 'border-gray-600 hover:border-amber-500' : 'border-amber-200 hover:bg-amber-50'
-                }`}
-              >
-                <span className="block whitespace-nowrap">{category.label}</span>
-                <span className="mt-0.5 block text-xs opacity-70">{category.count.toLocaleString()} 部</span>
-              </button>
+              <option key={category.value} value={category.value}>
+                {category.label}（{category.count.toLocaleString()} 部）
+              </option>
             ))}
-          </div>
+          </select>
         </div>
 
         {loading && <div className="text-center">加载中...</div>}

@@ -1,29 +1,15 @@
 import prisma from '../../lib/prisma.js';
 import * as deepseek from '../../lib/deepseek.js';
 
-// 文库只提供产品约定的八个“题材体裁”一级分类，避免把数据库中的其他文体混入导航。
-export const BOOK_CATEGORIES = [
-  '传奇',
-  '神怪小说',
-  '话本',
-  '拟话本',
-  '笔记小说',
-  '公案小说',
-  '世情小说',
-  '历史演义',
-] as const;
-
-export type BookCategory = (typeof BOOK_CATEGORIES)[number];
-
-export function isBookCategory(value: unknown): value is BookCategory {
-  return typeof value === 'string' && BOOK_CATEGORIES.some(category => category === value);
-}
+export const UNCATEGORIZED_VALUE = '__uncategorized__';
 
 // 获取书籍列表；分类条件必须同时用于列表和总数，保证分页统计一致。
-export async function getBookList(page: number = 1, category?: BookCategory) {
+export async function getBookList(page: number = 1, category?: string) {
   const pageSize = 9;
   const skip = (page - 1) * pageSize;
-  const where = category ? { category } : {};
+  const where = category === UNCATEGORIZED_VALUE
+    ? { category: null }
+    : category ? { category } : {};
 
   const [books, total] = await Promise.all([
     prisma.book.findMany({
@@ -99,19 +85,18 @@ export async function getBookContent(id: number) {
   };
 }
 
-// 即使某个分类暂时没有作品也要返回，确保前端始终完整展示八个一级分类。
+// 分类完全取自数据库实际值；空值作为“未分类”返回，不维护易失真的硬编码名单。
 export async function getBookCategories() {
   const groups = await prisma.book.groupBy({
     by: ['category'],
     _count: { _all: true },
-    where: { category: { in: [...BOOK_CATEGORIES] } },
+    orderBy: { category: 'asc' },
   });
 
-  const counts = new Map(groups.map(group => [group.category, group._count._all]));
-  return BOOK_CATEGORIES.map(category => ({
-    value: category,
-    label: category,
-    count: counts.get(category) || 0,
+  return groups.map(group => ({
+    value: group.category || UNCATEGORIZED_VALUE,
+    label: group.category || '未分类',
+    count: group._count._all,
   }));
 }
 

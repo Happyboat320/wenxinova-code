@@ -11,13 +11,7 @@ bookRouter.get('/', async (req: Request, res: Response) => {
   try {
     const page = Math.max(parseInt(req.query.page as string) || 1, 1);
     const category = typeof req.query.category === 'string' ? req.query.category.trim() : undefined;
-    // 分类值由后端统一校验，防止接口绕过页面请求未定义的分类。
-    if (category && !bookService.isBookCategory(category)) {
-      res.status(400).json(error('无效的书籍分类', 400));
-      return;
-    }
-    const validatedCategory = category && bookService.isBookCategory(category) ? category : undefined;
-    const result = await bookService.getBookList(page, validatedCategory);
+    const result = await bookService.getBookList(page, category || undefined);
     res.json(success(result));
   } catch (err) {
     console.error('获取书籍列表失败:', err);
