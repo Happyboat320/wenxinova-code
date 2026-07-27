@@ -49,7 +49,8 @@ export async function getBookList(page: number = 1, category?: string, query?: s
         summary: true,
       },
       where,
-      orderBy: { id: 'asc' },
+      // 新导入作品优先展示，避免新增整本作品沉到两万余条旧数据之后。
+      orderBy: { id: 'desc' },
       skip,
       take: pageSize,
     }),

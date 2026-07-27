@@ -34,8 +34,9 @@ interface CollectionDefinition {
 }
 
 const COLLECTIONS: CollectionDefinition[] = [
-  { file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清', category: '明清传奇', unit: '出/篇', expectedCount: 50 },
-  { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '明清传奇', unit: '出/篇', expectedCount: 48 },
+  // 归入书库已有“传奇”分类，避免与同义的“明清传奇”拆成两个筛选项。
+  { file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 50 },
+  { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 48 },
   { file: '金瓶梅.json', title: '金瓶梅', author: '兰陵笑笑生（疑）', dynasty: '明代', category: '世情小说', unit: '回', expectedCount: 69 },
   { file: '官场.json', title: '官场现形记', author: '李伯元', dynasty: '晚清', category: '世情小说', unit: '回', expectedCount: 20 },
   { file: '玉娇梨.json', title: '玉娇梨', author: '荑秋散人（一说天花藏主人）', dynasty: '明末清初', category: '世情小说', unit: '回', expectedCount: 20 },

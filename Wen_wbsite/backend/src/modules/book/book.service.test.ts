@@ -48,6 +48,7 @@ describe('文库实际数据分类', () => {
 
     expect(bookMock.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { category: '散文' },
+      orderBy: { id: 'desc' },
       skip: 9,
       take: 9,
     }));
