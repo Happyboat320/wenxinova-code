@@ -141,6 +141,22 @@ export interface CategoryOption {
   count: number;
 }
 
+export interface BookChapterOption {
+  id: number;
+  order: number;
+  title: string;
+}
+
+export interface BookContent {
+  title: string;
+  author: string;
+  content: string;
+  chapter: (BookChapterOption & { summary: string | null }) | null;
+  chapters: BookChapterOption[];
+  annotations: { index: number; content: string }[];
+  characters: { id: number; name: string; description: string | null }[];
+}
+
 export interface CommunityCreation {
   id: number;
   userId: number;
@@ -190,25 +206,13 @@ export async function getBookCategories(): Promise<CategoryOption[]> {
   return unwrap(response.data, '获取书籍分类失败');
 }
 
-export async function getBookContent(id: number): Promise<{
-  title: string;
-  author: string;
-  content: string;
-  annotations: { index: number; content: string }[];
-  characters: { id: number; name: string; description: string | null }[];
-}> {
-  const response = await client.get<ApiResponse<{
-    title: string;
-    author: string;
-    content: string;
-    annotations: { index: number; content: string }[];
-    characters: { id: number; name: string; description: string | null }[];
-  }>>(`/books/${id}/content`);
+export async function getBookContent(id: number, chapterId?: number): Promise<BookContent> {
+  const response = await client.get<ApiResponse<BookContent>>(`/books/${id}/content`, { params: { chapterId } });
   return unwrap(response.data, '获取书籍内容失败');
 }
 
-export async function getBookTranslation(id: number): Promise<string> {
-  const response = await client.post<ApiResponse<{ translation: string }>>(`/books/${id}/translation`, {});
+export async function getBookTranslation(id: number, chapterId?: number): Promise<string> {
+  const response = await client.post<ApiResponse<{ translation: string }>>(`/books/${id}/translation`, { chapterId });
   return unwrap(response.data, '获取译文失败').translation;
 }
 

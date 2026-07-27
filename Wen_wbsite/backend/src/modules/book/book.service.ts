@@ -66,8 +66,8 @@ export async function getBookList(page: number = 1, category?: string, query?: s
   };
 }
 
-// 获取书籍内容和注释
-export async function getBookContent(id: number) {
+// 获取书籍内容；长篇作品可指定回目，普通单篇作品保持原有返回方式。
+export async function getBookContent(id: number, chapterId?: number) {
   const book = await prisma.book.findUnique({
     where: { id },
     select: {
@@ -92,17 +92,39 @@ export async function getBookContent(id: number) {
           index: 'asc',
         },
       },
+      chapters: {
+        select: {
+          id: true,
+          order: true,
+          title: true,
+          originalText: true,
+          summary: true,
+        },
+        orderBy: { order: 'asc' },
+      },
     },
   });
 
   if (!book) return null;
 
+  const activeChapter = chapterId === undefined
+    ? book.chapters[0]
+    : book.chapters.find(chapter => chapter.id === chapterId);
+  if (chapterId !== undefined && !activeChapter) return null;
+
   return {
     title: book.title,
     author: book.author,
-    content: book.originalText || '',
+    content: activeChapter?.originalText || book.originalText || '',
+    chapter: activeChapter ? {
+      id: activeChapter.id,
+      order: activeChapter.order,
+      title: activeChapter.title,
+      summary: activeChapter.summary,
+    } : null,
+    chapters: book.chapters.map(chapter => ({ id: chapter.id, order: chapter.order, title: chapter.title })),
     // 保留数据库里的真实序号；注释可能不是从 1 连续排列，不能再用数组下标猜测序号。
-    annotations: book.annotations,
+    annotations: activeChapter ? [] : book.annotations,
     characters: book.characters.length > 0
       ? book.characters
       : (book.mainCharacters || '')
@@ -132,40 +154,54 @@ export async function getBookCategories() {
     }));
 }
 
-// 获取书籍译文
-export async function getTranslation(id: number): Promise<string> {
+// 获取书籍译文；回目译文独立缓存，避免切换回目时串用其他篇章内容。
+export async function getTranslation(id: number, chapterId?: number): Promise<string> {
   const book = await prisma.book.findUnique({
     where: { id },
     select: {
       originalText: true,
       translatedText: true,
+      chapters: {
+        select: { id: true, order: true, originalText: true, translatedText: true },
+        orderBy: { order: 'asc' },
+      },
     },
   });
 
-  if (!book || !book.originalText) {
+  const chapter = chapterId === undefined
+    ? book?.chapters[0]
+    : book?.chapters.find(item => item.id === chapterId);
+  if (chapterId !== undefined && !chapter) throw new Error('回目不存在或不属于当前作品');
+  const originalText = chapter?.originalText || book?.originalText;
+  const cachedTranslation = chapter?.translatedText || book?.translatedText;
+
+  if (!book || !originalText) {
     throw new Error('书籍原文不存在');
   }
 
   // 先尝试从数据库获取
-  if (book.translatedText) {
-    return book.translatedText;
+  if (cachedTranslation) {
+    return cachedTranslation;
   }
 
   // 获取不到则调用 AI 翻译
-  const translation = await deepseek.translateToModernChinese(book.originalText);
+  const translation = await deepseek.translateToModernChinese(originalText);
 
   // 翻译后存入数据库
-  await prisma.book.update({
-    where: { id },
-    data: { translatedText: translation },
-  });
+  if (chapter) {
+    await prisma.bookChapter.update({ where: { id: chapter.id }, data: { translatedText: translation } });
+    // 首回同时更新兼容字段，供旧客户端及知识图谱等既有逻辑使用。
+    if (chapter.order === 1) await prisma.book.update({ where: { id }, data: { translatedText: translation } });
+  } else {
+    await prisma.book.update({ where: { id }, data: { translatedText: translation } });
+  }
 
   return translation;
 }
 
 // 流式获取书籍译文 (保留兼容性)
-export async function streamTranslation(id: number, res: any) {
-  const translation = await getTranslation(id);
+export async function streamTranslation(id: number, res: any, chapterId?: number) {
+  const translation = await getTranslation(id, chapterId);
   res.write(translation);
   res.end();
 }

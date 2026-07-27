@@ -15,6 +15,8 @@ interface BookData {
   title: string;
   author: string;
   content: string;
+  chapter: (api.BookChapterOption & { summary: string | null }) | null;
+  chapters: api.BookChapterOption[];
   annotations: { index: number; content: string }[];
   characters: { id: number; name: string; description: string | null }[];
 }
@@ -29,6 +31,8 @@ export default function BookViewPage() {
   const { isDark } = useTheme();
   const { user, openLogin } = useContext(AuthContext);
   const bookId = Number.parseInt(id || '', 10);
+  const requestedChapterValue = new URLSearchParams(location.search).get('chapter');
+  const requestedChapterId = requestedChapterValue ? Number.parseInt(requestedChapterValue, 10) : undefined;
 
   const [bookData, setBookData] = useState<BookData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,8 +58,10 @@ export default function BookViewPage() {
       try {
         setLoading(true);
         setError(null);
-        const data = await api.getBookContent(bookId);
+        const data = await api.getBookContent(bookId, requestedChapterId);
         setBookData({ id: bookId, ...data });
+        // 每个回目的译文相互独立，切换时不能继续展示上一回内容。
+        setTranslation('');
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : '加载书籍数据失败');
       } finally {
@@ -63,7 +69,7 @@ export default function BookViewPage() {
       }
     };
     void load();
-  }, [bookId]);
+  }, [bookId, requestedChapterId]);
 
   const annotationsByIndex = useMemo(
     () => new Map(bookData?.annotations.map(annotation => [annotation.index, annotation.content]) || []),
@@ -80,7 +86,7 @@ export default function BookViewPage() {
     }
     try {
       setTranslationLoading(true);
-      setTranslation(await api.getBookTranslation(bookId));
+      setTranslation(await api.getBookTranslation(bookId, bookData?.chapter?.id));
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : '加载译文失败');
     } finally {
@@ -120,6 +126,15 @@ export default function BookViewPage() {
   const readingActive = activeTab !== 'adapt' && activeTab !== 'knowledge';
   const requestedSection = new URLSearchParams(location.search).get('section');
   const initialScriptSection = requestedSection === 'props' || requestedSection === 'dm' ? requestedSection : 'role';
+  const activeChapterIndex = bookData.chapter
+    ? bookData.chapters.findIndex(chapter => chapter.id === bookData.chapter?.id)
+    : -1;
+
+  const changeChapter = (chapterId: number) => {
+    const params = new URLSearchParams(location.search);
+    params.set('chapter', String(chapterId));
+    navigate({ search: params.toString() });
+  };
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-stone-950 text-stone-100' : 'bg-[#f8f5ef] text-stone-800'}`}>
@@ -141,7 +156,47 @@ export default function BookViewPage() {
         <div className="mb-7 text-center">
           <h1 className="font-serif text-3xl font-bold text-amber-900">{bookData.title}</h1>
           {bookData.author.trim() && <p className="mt-2 text-stone-500">作者：{bookData.author}</p>}
+          {bookData.chapter && <p className="mt-3 font-serif text-xl text-amber-800">{bookData.chapter.title}</p>}
         </div>
+
+        {bookData.chapters.length > 0 && bookData.chapter && (
+          <section className={`mb-7 rounded-xl border p-4 shadow-sm ${isDark ? 'border-stone-700 bg-stone-900' : 'border-amber-200 bg-white'}`} aria-label="回目切换">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                disabled={activeChapterIndex <= 0}
+                onClick={() => changeChapter(bookData.chapters[activeChapterIndex - 1].id)}
+                className="rounded-lg border border-amber-300 px-4 py-2 text-amber-800 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <i className="fa-solid fa-chevron-left mr-2" />上一回
+              </button>
+              <label htmlFor="chapter-select" className="sr-only">选择回目</label>
+              <select
+                id="chapter-select"
+                value={bookData.chapter.id}
+                onChange={event => changeChapter(Number(event.target.value))}
+                className={`min-w-[20rem] max-w-full rounded-lg border border-amber-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDark ? 'bg-stone-800 text-stone-100' : 'bg-amber-50/60 text-stone-800'}`}
+              >
+                {bookData.chapters.map(chapter => (
+                  <option key={chapter.id} value={chapter.id}>{chapter.title}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={activeChapterIndex < 0 || activeChapterIndex >= bookData.chapters.length - 1}
+                onClick={() => changeChapter(bookData.chapters[activeChapterIndex + 1].id)}
+                className="rounded-lg border border-amber-300 px-4 py-2 text-amber-800 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                下一回<i className="fa-solid fa-chevron-right ml-2" />
+              </button>
+            </div>
+            {bookData.chapter.summary && (
+              <p className="mx-auto mt-4 max-w-4xl border-t border-amber-100 pt-4 text-sm leading-7 text-stone-500">
+                <span className="font-medium text-amber-800">本回梗概：</span>{bookData.chapter.summary}
+              </p>
+            )}
+          </section>
+        )}
 
         <div className="mb-8 flex justify-center border-b border-amber-200/70">
           <button onClick={() => { if (!readingActive) setActiveTab('original'); }}
@@ -204,7 +259,8 @@ export default function BookViewPage() {
         ) : activeTab === 'knowledge' ? (
           <KnowledgeGraphView bookId={bookId} />
         ) : (
-          <AdaptWorkspace bookId={bookId} title={bookData.title} author={bookData.author}
+          <AdaptWorkspace key={bookData.chapter?.id || 'single'} bookId={bookId}
+            title={bookData.chapter ? `${bookData.title} · ${bookData.chapter.title}` : bookData.title} author={bookData.author}
             originalText={bookData.content} characters={bookData.characters}
             initialMode={new URLSearchParams(location.search).get('mode') === 'script' ? 'script' : 'style'}
             initialScriptSection={initialScriptSection} />

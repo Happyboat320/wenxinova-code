@@ -73,7 +73,14 @@ bookRouter.get('/:id/content', async (req: Request, res: Response) => {
       return;
     }
 
-    const data = await bookService.getBookContent(id);
+    const rawChapterId = req.query.chapterId;
+    const chapterId = typeof rawChapterId === 'string' && rawChapterId !== '' ? Number(rawChapterId) : undefined;
+    if (chapterId !== undefined && (!Number.isInteger(chapterId) || chapterId <= 0)) {
+      res.status(400).json(error('无效的回目ID', 400));
+      return;
+    }
+
+    const data = await bookService.getBookContent(id, chapterId);
     if (!data) {
       res.status(404).json(error('书籍不存在', 404));
       return;
@@ -96,7 +103,12 @@ bookRouter.post('/:id/translation', requireAuth, aiUsageGuard, async (req: Reque
       return;
     }
 
-    const translation = await bookService.getTranslation(bookId);
+    const chapterId = req.body?.chapterId === undefined ? undefined : Number(req.body.chapterId);
+    if (chapterId !== undefined && (!Number.isInteger(chapterId) || chapterId <= 0)) {
+      res.status(400).json(error('无效的回目ID', 400));
+      return;
+    }
+    const translation = await bookService.getTranslation(bookId, chapterId);
     res.json(success({ translation }));
   } catch (err) {
     console.error('获取书籍译文失败:', err);

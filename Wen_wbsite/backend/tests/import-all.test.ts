@@ -7,6 +7,7 @@ import {
   readExcelSource,
   readJsonSource,
 } from '../scripts/import-all';
+import { chapterNumber, readCollection, sortChapterRows } from '../scripts/import-collections';
 
 describe('一键导入数据源', () => {
   it('读取全部数据并保持标题与去重规则一致', () => {
@@ -54,6 +55,30 @@ describe('一键导入数据源', () => {
     ]);
     expect(parseDocumentAnnotations('一段未编号注释')).toEqual([
       { index: 1, content: '一段未编号注释' },
+    ]);
+  });
+});
+
+describe('整本作品回目导入', () => {
+  it('识别常见中文回目编号并将前置篇章置顶', () => {
+    expect(chapterNumber('第卅三出 神诉')).toBe(33);
+    expect(chapterNumber('闰二十出 闲话')).toBe(20);
+    expect(chapterNumber('桃花扇小引')).toBeNull();
+    expect(sortChapterRows([
+      { 题目: '第二回 后篇' },
+      { 题目: '序' },
+      { 题目: '第一回 前篇' },
+    ]).map(row => row.题目)).toEqual(['序', '第一回 前篇', '第二回 后篇']);
+  });
+
+  it('读取五部作品并按回目编号排序', () => {
+    const longLife = readCollection({
+      file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清',
+      category: '明清传奇', unit: '出/篇', expectedCount: 50,
+    });
+    expect(longLife).toHaveLength(50);
+    expect(longLife.slice(0, 4).map(chapter => chapter.title)).toEqual([
+      '第一出 传概', '第二出 定情', '第三出 贿权', '第四出 春睡',
     ]);
   });
 });

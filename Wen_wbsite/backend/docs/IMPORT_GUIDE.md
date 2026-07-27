@@ -103,6 +103,26 @@ pnpm import:excel -- --clear
 pnpm import:text
 ```
 
+## 导入带回目切换的整本作品
+
+《长生殿》《桃花扇》《金瓶梅》《官场现形记》《玉娇梨》采用“一个 JSON
+文件对应一部作品、数组元素对应回目”的特殊结构。先将项目根目录的
+`1.zip` 解压至 `backend/data/collections/`，再执行：
+
+```bash
+cd backend
+npm run import:collections
+```
+
+导入器会应用数据库迁移、备份 SQLite 数据库，将序跋等前置篇章置顶，并按
+中文回目编号排序。重复执行时保留作品 ID，刷新其回目数据。只校验源文件时：
+
+```bash
+npx tsx scripts/import-collections.ts --dry-run
+```
+
+导入完成后需执行 `npm run search:reindex`，让五部作品进入全文检索索引。
+
 ## 导入结果验证
 - 调用 `GET /api/books/:id` 确认 `annotationCount`、`annotations` 字段；
 - 或参考 `docs/tests-guide.md` 运行 Vitest 用例。

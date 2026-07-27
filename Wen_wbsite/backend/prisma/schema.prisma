@@ -32,8 +32,28 @@ model Book {
   // 关联
   characters Character[]
   annotations Annotation[]
+  chapters    BookChapter[]
   creations   Creation[]
   knowledgeGraph BookKnowledgeGraph?
+}
+
+// 长篇作品的回目；普通单篇作品继续直接使用 Book.originalText。
+model BookChapter {
+  id             Int      @id @default(autoincrement())
+  bookId         Int
+  order          Int
+  title          String
+  originalText   String
+  translatedText String?
+  summary        String?
+  keywords       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, order])
+  @@index([bookId, title])
 }
 
 // 由 LLM 生成并复用的书籍知识图谱，JSON 以文本保存以兼容 SQLite。

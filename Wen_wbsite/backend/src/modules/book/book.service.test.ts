@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const bookMock = vi.hoisted(() => ({
   findMany: vi.fn(),
+  findUnique: vi.fn(),
   count: vi.fn(),
   groupBy: vi.fn(),
 }));
@@ -12,6 +13,7 @@ vi.mock('../../lib/prisma.js', () => ({
 
 import {
   getBookCategories,
+  getBookContent,
   getBookList,
   UNCATEGORIZED_VALUE,
 } from './book.service.js';
@@ -59,5 +61,27 @@ describe('文库实际数据分类', () => {
     await getBookList(1, UNCATEGORIZED_VALUE);
 
     expect(bookMock.count).toHaveBeenCalledWith({ where: { category: null } });
+  });
+
+  it('长篇作品默认返回首回，并允许选择指定回目', async () => {
+    bookMock.findUnique.mockResolvedValue({
+      title: '玉娇梨',
+      author: '荑秋散人',
+      originalText: '兼容原文',
+      mainCharacters: null,
+      characters: [],
+      annotations: [{ index: 1, content: '普通注释' }],
+      chapters: [
+        { id: 11, order: 1, title: '第一回', originalText: '首回正文', summary: '首回梗概' },
+        { id: 12, order: 2, title: '第二回', originalText: '次回正文', summary: null },
+      ],
+    });
+
+    await expect(getBookContent(7, 12)).resolves.toMatchObject({
+      title: '玉娇梨',
+      content: '次回正文',
+      chapter: { id: 12, title: '第二回' },
+      annotations: [],
+    });
   });
 });
