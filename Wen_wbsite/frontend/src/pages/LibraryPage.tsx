@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from "@/hooks/useTheme";
 import * as api from "@/api";
@@ -16,12 +16,13 @@ type Book = {
 const LibraryPage = () => {
   const { isDark } = useTheme();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = (searchParams.get('q') || '').trim();
 
   const [books, setBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<api.CategoryOption[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState(searchQuery);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -33,6 +34,12 @@ const LibraryPage = () => {
       .then(setCategories)
       .catch(err => setError(err instanceof Error ? err.message : '获取书籍分类失败'));
   }, []);
+
+  useEffect(() => {
+    // 支持从首页进入、浏览器前进后退及分享链接恢复检索关键词。
+    setSearchInput(searchQuery);
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   useEffect(() => {
     const load = async () => {
@@ -60,13 +67,14 @@ const LibraryPage = () => {
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSearchQuery(searchInput.trim());
+    const query = searchInput.trim();
+    setSearchParams(query ? { q: query } : {});
     setCurrentPage(1);
   };
 
   const clearSearch = () => {
     setSearchInput('');
-    setSearchQuery('');
+    setSearchParams({});
     setCurrentPage(1);
   };
 

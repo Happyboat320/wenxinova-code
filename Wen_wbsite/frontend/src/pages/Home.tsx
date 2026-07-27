@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, type CSSProperties } from "react";
+import { useContext, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
@@ -81,6 +81,7 @@ export default function Home() {
     const appRef = useRef<HTMLDivElement>(null);
     const cardsRef = useRef<HTMLElement>(null);
     const shouldReduceMotion = useReducedMotion();
+    const [searchInput, setSearchInput] = useState('');
 
     useEffect(() => { appRef.current?.classList.add("fade-in"); }, []);
 
@@ -101,6 +102,13 @@ export default function Home() {
 
     const scrollToSection = (section: HTMLElement | null) => {
         section?.scrollIntoView({ behavior: shouldReduceMotion ? "auto" : "smooth", block: "start" });
+    };
+
+    const submitLibrarySearch = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const query = searchInput.trim();
+        // 通过 URL 传递关键词，进入文库后可立即检索，刷新页面也能保留条件。
+        navigate(query ? `/classical-library?q=${encodeURIComponent(query)}` : '/classical-library');
     };
 
     return (
@@ -127,10 +135,17 @@ export default function Home() {
                     <motion.p className="home-hero-kicker" variants={itemVariants}>古典新生 · 智启文心</motion.p>
                     <motion.h2 className="home-hero-title title-serif" variants={itemVariants}>智能古典文学改编平台</motion.h2>
                     <motion.p className="home-hero-copy" variants={itemVariants}>探索古典文学的无限可能，AI 助力您创作独具魅力的现代演绎</motion.p>
-                    <motion.form className="home-search-shell" variants={itemVariants} onSubmit={(event) => event.preventDefault()} role="search">
+                    <motion.form className="home-search-shell" variants={itemVariants} onSubmit={submitLibrarySearch} role="search">
                         <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
-                        <input type="search" aria-label="检索古典文学内容" placeholder="检索古典作品、人物或主题……" />
-                        <button type="submit" aria-label="检索功能即将开放" title="检索功能即将开放">检索</button>
+                        <input
+                            type="search"
+                            value={searchInput}
+                            onChange={event => setSearchInput(event.target.value)}
+                            maxLength={100}
+                            aria-label="检索标题、作者或梗概"
+                            placeholder="检索标题、作者或梗概"
+                        />
+                        <button type="submit" aria-label="检索古典文库">检索</button>
                     </motion.form>
                 </motion.div>
                 <motion.button
