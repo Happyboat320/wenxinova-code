@@ -23,6 +23,15 @@ interface DeepSeekResponse {
 }
 
 function getMockResponse(prompt: string): string {
+  if (prompt.includes('timeline') && prompt.includes('relationships')) {
+    return JSON.stringify({
+      timeline: [{ id: 'event-1', time: '故事开端', title: '人物登场', description: '主要人物相遇，故事由此展开。', characters: ['主角'] }],
+      relationships: {
+        nodes: [{ id: 'character-1', name: '主角', description: '故事核心人物' }],
+        edges: [],
+      },
+    });
+  }
   if (prompt.includes('翻译')) {
     return '【模拟译文】\n\n这是模拟生成的现代汉语译文，用于替代真实的 AI 翻译结果。';
   }
@@ -217,6 +226,65 @@ export async function customPrompt(content: string, prompt: string): Promise<str
     temperature: 0.7,
     max_tokens: 2500,
   });
+}
+
+export interface KnowledgeGraphData {
+  timeline: Array<{ id: string; time: string; title: string; description: string; characters: string[] }>;
+  relationships: {
+    nodes: Array<{ id: string; name: string; description: string }>;
+    edges: Array<{ source: string; target: string; relation: string; description: string }>;
+  };
+}
+
+function parseKnowledgeGraph(raw: string): KnowledgeGraphData {
+  const normalized = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  const value = JSON.parse(normalized) as KnowledgeGraphData;
+  if (!Array.isArray(value.timeline)
+    || !Array.isArray(value.relationships?.nodes)
+    || !Array.isArray(value.relationships?.edges)) {
+    throw new Error('知识图谱 JSON 结构不完整');
+  }
+  const clean = (input: unknown, max: number) => typeof input === 'string' ? input.trim().slice(0, max) : '';
+  const nodes = value.relationships.nodes.slice(0, 30).map((node, index) => ({
+    id: clean(node.id, 50) || `character-${index + 1}`,
+    name: clean(node.name, 30),
+    description: clean(node.description, 200),
+  })).filter(node => node.name);
+  const nodeIds = new Set(nodes.map(node => node.id));
+  return {
+    timeline: value.timeline.slice(0, 30).map((event, index) => ({
+      id: clean(event.id, 50) || `event-${index + 1}`,
+      time: clean(event.time, 50) || `阶段 ${index + 1}`,
+      title: clean(event.title, 80),
+      description: clean(event.description, 500),
+      characters: Array.isArray(event.characters) ? event.characters.map(name => clean(name, 30)).filter(Boolean).slice(0, 10) : [],
+    })).filter(event => event.title),
+    relationships: {
+      nodes,
+      edges: value.relationships.edges.slice(0, 80).map(edge => ({
+        source: clean(edge.source, 50),
+        target: clean(edge.target, 50),
+        relation: clean(edge.relation, 50),
+        description: clean(edge.description, 200),
+      })).filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target) && edge.source !== edge.target && edge.relation),
+    },
+  };
+}
+
+/** 使用固定结构化提示词生成时间线和人物关系，返回前先做严格 JSON 清洗。 */
+export async function generateKnowledgeGraph(title: string, author: string, originalText: string): Promise<KnowledgeGraphData> {
+  const prompt = `请分析《${title}》（作者：${author || '佚名'}），生成知识图谱。严格只输出一个合法 JSON 对象，不使用 Markdown 代码块。结构必须为：
+{"timeline":[{"id":"event-1","time":"原文中的时间或叙事阶段","title":"事件标题","description":"事件及因果说明","characters":["人物名"]}],"relationships":{"nodes":[{"id":"character-1","name":"人物名","description":"身份、性格与作用"}],"edges":[{"source":"character-1","target":"character-2","relation":"关系名称","description":"关系依据及变化"}]}}
+要求：时间线按故事顺序列出 5-20 个关键事件；人物节点 2-20 个；边的 source/target 必须使用 nodes 中的 id；只依据原文，不虚构。
+原文：
+${originalText.slice(0, 30000)}`;
+  const raw = await callDeepSeekAPI([
+    { role: 'system', content: '你是古典文学知识图谱专家，擅长从原文提取事件顺序与人物关系。输出必须是机器可解析的 JSON。' },
+    { role: 'user', content: prompt },
+  ], { temperature: 0.2, max_tokens: 4000 });
+  const graph = parseKnowledgeGraph(raw);
+  if (!graph.timeline.length || !graph.relationships.nodes.length) throw new Error('知识图谱内容为空');
+  return graph;
 }
 
 export async function chat(

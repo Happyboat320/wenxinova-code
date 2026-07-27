@@ -33,6 +33,19 @@ model Book {
   characters Character[]
   annotations Annotation[]
   creations   Creation[]
+  knowledgeGraph BookKnowledgeGraph?
+}
+
+// 由 LLM 生成并复用的书籍知识图谱，JSON 以文本保存以兼容 SQLite。
+model BookKnowledgeGraph {
+  id               Int      @id @default(autoincrement())
+  bookId           Int      @unique
+  timelineJson     String
+  relationshipJson String
+  generatedAt      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
 }
 
 // 角色表（剧本杀角色）
@@ -71,12 +84,35 @@ model User {
   passwordHash    String?
   phoneVerifiedAt DateTime?
   status          String           @default("active")
+  role            String           @default("user") // user/admin
   creations       Creation[]
   creationLikes   CreationLike[]
   comments        CreationComment[]
+  adminApplications AdminApplication[] @relation("AdminApplicant")
+  reviewedAdminApplications AdminApplication[] @relation("AdminApplicationReviewer")
+  reviewedCreations Creation[] @relation("CreationReviewer")
   refreshSessions RefreshSession[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+// 普通用户申请管理员；审核备注同时记录通过或驳回理由。
+model AdminApplication {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  remark     String
+  status     String    @default("pending") // pending/approved/rejected
+  reviewNote String?
+  reviewerId Int?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user     User  @relation("AdminApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("AdminApplicationReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }
 
 // Refresh Token 会话；数据库中只保存令牌哈希
@@ -104,21 +140,27 @@ model Creation {
   userId      Int
   bookId      Int?
   category    String    @default("other") // 社区分类：adaptation/script/props/dm/other
-  status      String    @default("draft") // draft/published
+  status      String    @default("draft") // draft/pending/published/rejected
   prompt      String    // 提示词
   content     String    // 生成的内容
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
   publishedAt DateTime?
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewedById Int?
+  reviewNote  String?
 
   // 关联
   user User @relation(fields: [userId], references: [id])
   book Book? @relation(fields: [bookId], references: [id])
   likes CreationLike[]
   comments CreationComment[]
+  reviewedBy User? @relation("CreationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([status, category, publishedAt])
   @@index([userId, status, updatedAt])
+  @@index([status, submittedAt])
 }
 
 // 社区点赞：每位用户对同一篇已发布作品最多点赞一次。

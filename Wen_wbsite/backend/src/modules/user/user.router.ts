@@ -37,7 +37,7 @@ userRouter.patch('/me/profile', requireAuth, async (req: Request, res: Response)
   }
 });
 
-// 保存草稿或发布创作
+// 保存草稿或提交发布；普通用户进入审核队列，管理员作品直接公开。
 userRouter.post('/creation', requireAuth, async (req: Request, res: Response) => {
   try {
     const { bookId, category = 'other', prompt, content, action = 'draft', draftId } = req.body;
@@ -59,11 +59,37 @@ userRouter.post('/creation', requireAuth, async (req: Request, res: Response) =>
       action,
       draftId: draftId ? Number(draftId) : undefined,
     });
-    if (!creation) return res.status(404).json(error('草稿不存在或已发布', 404));
+    if (!creation) return res.status(404).json(error('草稿不存在、正在审核或已发布', 404));
     res.json(success(creation));
   } catch (err: any) {
     console.error('保存创作失败:', err);
     res.status(500).json(error('保存创作失败'));
+  }
+});
+
+userRouter.get('/me/admin-application', requireAuth, async (req: Request, res: Response) => {
+  try {
+    res.json(success(await userService.getLatestAdminApplication(req.auth!.userId)));
+  } catch (err) {
+    console.error('获取管理员申请失败:', err);
+    res.status(500).json(error('获取管理员申请失败'));
+  }
+});
+
+userRouter.post('/me/admin-application', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const remark = typeof req.body?.remark === 'string' ? req.body.remark.trim() : '';
+    if (Array.from(remark).length < 5 || Array.from(remark).length > 500) {
+      return res.status(400).json(error('申请备注需为 5-500 个字符', 400));
+    }
+    const result = await userService.applyForAdmin(req.auth!.userId, remark);
+    if (result.kind === 'admin') return res.status(409).json(error('您已经是管理员', 409));
+    if (result.kind === 'pending') return res.status(409).json(error('已有待审核申请，请勿重复提交', 409));
+    if (result.kind === 'missing') return res.status(404).json(error('用户不存在', 404));
+    res.status(201).json(success(result.application, '管理员申请已提交'));
+  } catch (err) {
+    console.error('提交管理员申请失败:', err);
+    res.status(500).json(error('提交管理员申请失败'));
   }
 });
 

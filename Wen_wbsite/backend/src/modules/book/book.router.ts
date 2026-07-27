@@ -5,6 +5,7 @@ import { requireAuth } from '../auth/auth.middleware.js';
 import { aiUsageGuard } from '../auth/rate-limit.js';
 import { isSearchQueryTooLong, normalizeSearchQuery } from '../search/search.service.js';
 import { SearchUnavailableError } from '../../lib/manticore.js';
+import * as knowledgeGraphService from './knowledge-graph.service.js';
 
 export const bookRouter = Router();
 
@@ -35,6 +36,31 @@ bookRouter.get('/categories', async (_req: Request, res: Response) => {
   } catch (err) {
     console.error('获取书籍分类失败:', err);
     res.status(500).json(error('获取书籍分类失败'));
+  }
+});
+
+// 已生成的知识图谱公开读取；首次生成需登录并受 AI 调用限流保护。
+bookRouter.get('/:id/knowledge-graph', async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json(error('无效的书籍ID', 400));
+    res.json(success(await knowledgeGraphService.getKnowledgeGraph(id)));
+  } catch (caught) {
+    console.error('获取知识图谱失败:', caught);
+    res.status(500).json(error('获取知识图谱失败'));
+  }
+});
+
+bookRouter.post('/:id/knowledge-graph', requireAuth, aiUsageGuard, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json(error('无效的书籍ID', 400));
+    const graph = await knowledgeGraphService.generateAndCacheKnowledgeGraph(id);
+    if (!graph) return res.status(404).json(error('书籍不存在', 404));
+    res.json(success(graph, '知识图谱已生成'));
+  } catch (caught) {
+    console.error('生成知识图谱失败:', caught);
+    res.status(500).json(error(caught instanceof Error ? caught.message : '生成知识图谱失败'));
   }
 });
 

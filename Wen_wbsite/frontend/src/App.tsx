@@ -12,6 +12,7 @@ import type { User } from '@/api';
 import * as api from '@/api';
 import AuthModal from '@/components/AuthModal';
 import ProfilePage from '@/pages/ProfilePage';
+import AdminPage from '@/pages/AdminPage';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -55,6 +56,7 @@ function App() {
         <Route path="/ugc-community" element={<UGCCommunityPage />} />
         <Route path="/my-collection" element={<MyCollectionPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
       <Toaster />
       <AuthModal

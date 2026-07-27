@@ -23,6 +23,19 @@ interface Props {
 type WorkspaceMode = 'style' | 'script';
 type ScriptSection = 'props' | 'role' | 'dm';
 
+interface WorkspaceCache {
+  style: string;
+  styleRequirement: string;
+  selectedCharacter: string;
+  generatedCharacters: Character[];
+  result: string;
+  continuationRequirement: string;
+}
+
+function readCache(key: string): Partial<WorkspaceCache> | null {
+  try { return JSON.parse(localStorage.getItem(key) || 'null') as Partial<WorkspaceCache> | null; } catch { return null; }
+}
+
 const styles = [
   '浪漫言情', '恐怖悬疑', '武侠江湖', '侦探推理', '科幻幻想',
   '幽默诙谐', '讽刺批判', '奇幻冒险', '温馨治愈', '官场职场', '仙侠修真',
@@ -56,8 +69,9 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [draftLoading, setDraftLoading] = useState(false);
+  const [hydratedCacheKey, setHydratedCacheKey] = useState('');
   const [draftId, setDraftId] = useState<number | undefined>();
-  const [persistedVersion, setPersistedVersion] = useState<{ status: 'draft' | 'published'; content: string } | null>(null);
+  const [persistedVersion, setPersistedVersion] = useState<{ status: api.Creation['status']; content: string } | null>(null);
 
   const roleOptions = generatedCharacters.length > 0 ? generatedCharacters : characters;
 
@@ -82,6 +96,21 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
   const creationCategory: api.CreationCategory = mode === 'style'
     ? 'adaptation'
     : scriptSection === 'role' ? 'script' : scriptSection;
+  const cacheKey = `wenxin:workspace:v1:${user?.id || 'guest'}:${bookId}:${creationCategory}`;
+  const navigationCacheKey = `wenxin:workspace-nav:v1:${user?.id || 'guest'}:${bookId}`;
+
+  // 页面重新挂载时先恢复上次停留的创作模式，再加载该分类的编辑内容。
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(navigationCacheKey) || 'null') as { mode?: WorkspaceMode; scriptSection?: ScriptSection } | null;
+      if (saved?.mode === 'style' || saved?.mode === 'script') setMode(saved.mode);
+      if (saved?.scriptSection === 'props' || saved?.scriptSection === 'role' || saved?.scriptSection === 'dm') setScriptSection(saved.scriptSection);
+    } catch { /* 浏览器禁用存储时仍可正常使用在线功能。 */ }
+  }, [navigationCacheKey]);
+
+  useEffect(() => {
+    try { localStorage.setItem(navigationCacheKey, JSON.stringify({ mode, scriptSection })); } catch { /* 忽略存储配额错误。 */ }
+  }, [mode, navigationCacheKey, scriptSection]);
 
   useEffect(() => {
     if (!user) {
@@ -89,22 +118,37 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
       return;
     }
     let cancelled = false;
+    setHydratedCacheKey('');
     setDraftLoading(true);
+    const cached = readCache(cacheKey);
     api.getDraft(bookId, creationCategory)
       .then(draft => {
         if (cancelled) return;
         setDraftId(draft?.id);
-        setResult(draft?.content || '');
-        setPersistedVersion(draft ? { status: 'draft', content: draft.content } : null);
+        // 本地内容可能比服务端草稿更新，优先恢复用户离开页面前的编辑现场。
+        setResult(typeof cached?.result === 'string' ? cached.result : draft?.content || '');
+        if (typeof cached?.style === 'string' && styles.includes(cached.style)) setStyle(cached.style);
+        if (typeof cached?.styleRequirement === 'string') setStyleRequirement(cached.styleRequirement);
+        if (typeof cached?.selectedCharacter === 'string') setSelectedCharacter(cached.selectedCharacter);
+        if (Array.isArray(cached?.generatedCharacters)) setGeneratedCharacters(cached.generatedCharacters);
+        if (typeof cached?.continuationRequirement === 'string') setContinuationRequirement(cached.continuationRequirement);
+        setPersistedVersion(draft ? { status: draft.status, content: draft.content } : null);
       })
       .catch(caught => {
         if (!cancelled) toast.error(caught instanceof Error ? caught.message : '草稿恢复失败');
       })
       .finally(() => {
-        if (!cancelled) setDraftLoading(false);
+        if (!cancelled) { setDraftLoading(false); setHydratedCacheKey(cacheKey); }
       });
     return () => { cancelled = true; };
-  }, [bookId, creationCategory, user]);
+  }, [bookId, cacheKey, creationCategory, user]);
+
+  useEffect(() => {
+    // 分类切换的首帧不能把空白状态误写到目标分类缓存。
+    if (hydratedCacheKey !== cacheKey) return;
+    const state: WorkspaceCache = { style, styleRequirement, selectedCharacter, generatedCharacters, result, continuationRequirement };
+    try { localStorage.setItem(cacheKey, JSON.stringify(state)); } catch { /* 内容过大或隐私模式下静默降级。 */ }
+  }, [cacheKey, continuationRequirement, generatedCharacters, hydratedCacheKey, result, selectedCharacter, style, styleRequirement]);
 
   const generate = async () => {
     if (!user) {
@@ -207,8 +251,8 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
         toast.success('已保存到“我的创作 · 草稿”');
       } else {
         setDraftId(undefined);
-        setPersistedVersion({ status: 'published', content: creation.content });
-        toast.success('已发布到 UGC 社区');
+        setPersistedVersion({ status: creation.status, content: creation.content });
+        toast.success(creation.status === 'published' ? '已发布到 UGC 社区' : '已提交审核，通过后将在 UGC 社区公开');
       }
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : action === 'draft' ? '保存失败' : '发布失败');
@@ -305,7 +349,7 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
 
       <div className="mt-6 flex justify-center gap-4">
         <button onClick={() => void persist('draft')} disabled={!result.trim() || saving || publishing || draftLoading || Boolean(contentUnchanged)} className="btn-secondary min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-floppy-disk mr-2" />{saving ? '保存中...' : '保存'}</button>
-        <button onClick={() => void persist('publish')} disabled={!result.trim() || saving || publishing || draftLoading || (persistedVersion?.status === 'published' && contentUnchanged)} className="btn-primary min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-paper-plane mr-2" />{publishing ? '发布中...' : '发布'}</button>
+        <button onClick={() => void persist('publish')} disabled={!result.trim() || saving || publishing || draftLoading || ((persistedVersion?.status === 'published' || persistedVersion?.status === 'pending') && contentUnchanged)} className="btn-primary min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-paper-plane mr-2" />{publishing ? '提交中...' : user?.role === 'admin' ? '发布' : '提交审核'}</button>
         <button onClick={exportResult} disabled={!result.trim()} className="btn-secondary min-w-40 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-download mr-2" />导出</button>
       </div>
 

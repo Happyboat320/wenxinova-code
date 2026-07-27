@@ -3,11 +3,12 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import * as api from '@/api';
 import AdaptWorkspace from '@/components/AdaptWorkspace';
+import KnowledgeGraphView from '@/components/KnowledgeGraphView';
 import { AuthContext } from '@/contexts/authContext';
 import { useTheme } from '@/hooks/useTheme';
 
 type ReadingTab = 'original' | 'annotated' | 'translation';
-type PageTab = ReadingTab | 'adapt';
+type PageTab = ReadingTab | 'adapt' | 'knowledge';
 
 interface BookData {
   id: number;
@@ -38,7 +39,7 @@ export default function BookViewPage() {
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    if (tab && ['original', 'annotated', 'translation', 'adapt'].includes(tab)) {
+    if (tab && ['original', 'annotated', 'translation', 'adapt', 'knowledge'].includes(tab)) {
       setActiveTab(tab as PageTab);
     }
   }, [location.search]);
@@ -116,7 +117,7 @@ export default function BookViewPage() {
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#f8f5ef] text-stone-600">正在展开书卷…</div>;
   if (error || !bookData) return <div className="flex min-h-screen items-center justify-center bg-[#f8f5ef] text-red-700">{error || '书籍不存在'}</div>;
 
-  const readingActive = activeTab !== 'adapt';
+  const readingActive = activeTab !== 'adapt' && activeTab !== 'knowledge';
   const requestedSection = new URLSearchParams(location.search).get('section');
   const initialScriptSection = requestedSection === 'props' || requestedSection === 'dm' ? requestedSection : 'role';
 
@@ -143,7 +144,7 @@ export default function BookViewPage() {
         </div>
 
         <div className="mb-8 flex justify-center border-b border-amber-200/70">
-          <button onClick={() => setActiveTab(activeTab === 'adapt' ? 'original' : activeTab)}
+          <button onClick={() => { if (!readingActive) setActiveTab('original'); }}
             className={`px-8 py-3 transition ${readingActive ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>
             阅读文本
           </button>
@@ -151,7 +152,7 @@ export default function BookViewPage() {
             className={`px-8 py-3 transition ${activeTab === 'adapt' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>
             创意工坊
           </button>
-          <button onClick={() => toast.info('知识图谱正在建设中')} className="px-8 py-3 text-stone-600 transition hover:text-amber-800">知识图谱</button>
+          <button onClick={() => setActiveTab('knowledge')} className={`px-8 py-3 transition ${activeTab === 'knowledge' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>知识图谱</button>
         </div>
 
         {readingActive ? (
@@ -200,6 +201,8 @@ export default function BookViewPage() {
               </>
             )}
           </section>
+        ) : activeTab === 'knowledge' ? (
+          <KnowledgeGraphView bookId={bookId} />
         ) : (
           <AdaptWorkspace bookId={bookId} title={bookData.title} author={bookData.author}
             originalText={bookData.content} characters={bookData.characters}

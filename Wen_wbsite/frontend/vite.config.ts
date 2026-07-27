@@ -13,4 +13,8 @@ function getPlugins() {
 
 export default defineConfig({
   plugins: getPlugins(),
+  build: {
+    // 大字体和封面由构建脚本在打包后复制，避免低配服务器并发复制时阻塞 Rollup。
+    copyPublicDir: false,
+  },
 });

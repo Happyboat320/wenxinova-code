@@ -7,6 +7,7 @@ import { adaptRouter } from './modules/adapt/adapt.router.js';
 import { userRouter } from './modules/user/user.router.js';
 import { communityRouter } from './modules/community/community.router.js';
 import { authRouter } from './modules/auth/auth.router.js';
+import { adminRouter } from './modules/admin/admin.router.js';
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/adapt', adaptRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/community', communityRouter);
+app.use('/api/admin', adminRouter);
 
 // API 404 处理
 app.use('/api', (req, res) => {

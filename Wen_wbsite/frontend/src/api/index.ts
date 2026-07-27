@@ -40,6 +40,7 @@ export interface User {
   signature: string | null;
   avatar: string | null;
   status: string;
+  role: 'user' | 'admin';
   phoneVerifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -104,11 +105,32 @@ export interface Creation {
   category: CreationCategory;
   prompt: string;
   content: string;
-  status: 'draft' | 'published';
+  status: 'draft' | 'pending' | 'published' | 'rejected';
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
   book?: { title: string } | null;
+}
+
+export interface AdminApplication {
+  id: number;
+  remark: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface KnowledgeGraph {
+  timeline: Array<{ id: string; time: string; title: string; description: string; characters: string[] }>;
+  relationships: {
+    nodes: Array<{ id: string; name: string; description: string }>;
+    edges: Array<{ source: string; target: string; relation: string; description: string }>;
+  };
+  generatedAt: string;
 }
 
 export type CreationCategory = 'adaptation' | 'script' | 'props' | 'dm' | 'other';
@@ -188,6 +210,21 @@ export async function getBookContent(id: number): Promise<{
 export async function getBookTranslation(id: number): Promise<string> {
   const response = await client.post<ApiResponse<{ translation: string }>>(`/books/${id}/translation`, {});
   return unwrap(response.data, '获取译文失败').translation;
+}
+
+export async function getKnowledgeGraph(id: number): Promise<KnowledgeGraph | null> {
+  const response = await client.get<ApiResponse<KnowledgeGraph | null>>(`/books/${id}/knowledge-graph`);
+  return unwrap(response.data, '获取知识图谱失败');
+}
+
+export async function generateKnowledgeGraph(id: number): Promise<KnowledgeGraph> {
+  const response = await client.post<ApiResponse<KnowledgeGraph>>(`/books/${id}/knowledge-graph`, {});
+  return unwrap(response.data, '生成知识图谱失败');
+}
+
+export async function regenerateKnowledgeGraph(id: number): Promise<KnowledgeGraph> {
+  const response = await client.post<ApiResponse<KnowledgeGraph>>(`/admin/books/${id}/knowledge-graph/regenerate`, {});
+  return unwrap(response.data, '重新生成知识图谱失败');
 }
 
 export async function adaptBook(
@@ -279,6 +316,39 @@ export async function getDraft(bookId: number, category: CreationCategory): Prom
 export async function getUserCreations(): Promise<Creation[]> {
   const response = await client.get<ApiResponse<Creation[]>>('/users/me/creations');
   return unwrap(response.data, '获取创作历史失败');
+}
+
+export async function getAdminApplication(): Promise<AdminApplication | null> {
+  const response = await client.get<ApiResponse<AdminApplication | null>>('/users/me/admin-application');
+  return unwrap(response.data, '获取管理员申请失败');
+}
+
+export async function applyForAdmin(remark: string): Promise<AdminApplication> {
+  const response = await client.post<ApiResponse<AdminApplication>>('/users/me/admin-application', { remark });
+  return unwrap(response.data, '提交管理员申请失败');
+}
+
+export interface AdminDashboard {
+  creations: Array<Creation & {
+    user: { id: number; phone: string; nickname: string | null; avatar: string | null };
+    book: { title: string } | null;
+  }>;
+  applications: Array<AdminApplication & {
+    user: { id: number; phone: string; nickname: string | null; avatar: string | null };
+  }>;
+}
+
+export async function getAdminDashboard(): Promise<AdminDashboard> {
+  const response = await client.get<ApiResponse<AdminDashboard>>('/admin/dashboard');
+  return unwrap(response.data, '加载管理审核台失败');
+}
+
+export async function reviewCreation(id: number, decision: 'approve' | 'reject', reviewNote: string): Promise<void> {
+  await client.post(`/admin/creations/${id}/review`, { decision, reviewNote });
+}
+
+export async function reviewAdminApplication(id: number, decision: 'approve' | 'reject', reviewNote: string): Promise<void> {
+  await client.post(`/admin/applications/${id}/review`, { decision, reviewNote });
 }
 
 export async function getCommunityCreations(page = 1, category?: CreationCategory, query?: string): Promise<{

@@ -20,7 +20,7 @@ const MyCollectionPage = () => {
   const [creations, setCreations] = useState<api.Creation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<'draft' | 'published'>('draft');
+  const [selectedStatus, setSelectedStatus] = useState<api.Creation['status']>('draft');
 
   useEffect(() => {
     if (!user) return;
@@ -41,6 +41,8 @@ const MyCollectionPage = () => {
   const visibleCreations = creations.filter(creation => creation.status === selectedStatus);
   const draftCount = creations.filter(creation => creation.status === 'draft').length;
   const publishedCount = creations.filter(creation => creation.status === 'published').length;
+  const pendingCount = creations.filter(creation => creation.status === 'pending').length;
+  const rejectedCount = creations.filter(creation => creation.status === 'rejected').length;
 
   return (
     <div className={`min-h-screen p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
@@ -80,12 +82,18 @@ const MyCollectionPage = () => {
 
         {user && (
           <div className="mb-8 flex justify-center">
-            <div className={`inline-flex rounded-xl border border-amber-200 p-1.5 ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className={`inline-flex flex-wrap justify-center rounded-xl border border-amber-200 p-1.5 ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
               <button onClick={() => setSelectedStatus('draft')} className={`rounded-lg px-7 py-2.5 transition ${selectedStatus === 'draft' ? 'bg-amber-700 text-white shadow' : 'text-amber-800 hover:bg-amber-50'}`}>
                 <i className="fa-regular fa-file-lines mr-2" />草稿 <span className="ml-1 opacity-70">{draftCount}</span>
               </button>
               <button onClick={() => setSelectedStatus('published')} className={`rounded-lg px-7 py-2.5 transition ${selectedStatus === 'published' ? 'bg-amber-700 text-white shadow' : 'text-amber-800 hover:bg-amber-50'}`}>
                 <i className="fa-solid fa-globe mr-2" />已发布 <span className="ml-1 opacity-70">{publishedCount}</span>
+              </button>
+              <button onClick={() => setSelectedStatus('pending')} className={`rounded-lg px-7 py-2.5 transition ${selectedStatus === 'pending' ? 'bg-amber-700 text-white shadow' : 'text-amber-800 hover:bg-amber-50'}`}>
+                <i className="fa-regular fa-clock mr-2" />审核中 <span className="ml-1 opacity-70">{pendingCount}</span>
+              </button>
+              <button onClick={() => setSelectedStatus('rejected')} className={`rounded-lg px-7 py-2.5 transition ${selectedStatus === 'rejected' ? 'bg-amber-700 text-white shadow' : 'text-amber-800 hover:bg-amber-50'}`}>
+                <i className="fa-solid fa-rotate-left mr-2" />待修改 <span className="ml-1 opacity-70">{rejectedCount}</span>
               </button>
             </div>
           </div>
@@ -103,8 +111,8 @@ const MyCollectionPage = () => {
         {user && error && <div className="text-center py-16 text-red-600">{error}</div>}
         {user && !loading && !error && visibleCreations.length === 0 && (
           <div className="bg-white rounded-2xl p-10 shadow-lg text-center">
-            <h3 className="text-2xl font-medium mb-3">{selectedStatus === 'draft' ? '暂无草稿' : '您还没有发布的创作'}</h3>
-            <p className="opacity-65">{selectedStatus === 'draft' ? '在创意工坊点击“保存”后，未发布的文本会出现在这里。' : '在创意工坊点击“发布”后，作品会同时展示在 UGC 社区。'}</p>
+            <h3 className="text-2xl font-medium mb-3">该分类暂无作品</h3>
+            <p className="opacity-65">普通用户提交发布后需经管理员审核，通过后才会展示在 UGC 社区。</p>
             <Link to="/classical-library" className="btn-primary inline-block mt-4">浏览古典文库</Link>
           </div>
         )}
@@ -116,18 +124,19 @@ const MyCollectionPage = () => {
                 <div>
                   <div className="mb-2 flex flex-wrap gap-2">
                     <span className="inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-800">{categoryLabels[creation.category] || '其他'}</span>
-                    <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${creation.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>{creation.status === 'draft' ? '草稿' : '已发布'}</span>
+                    <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${creation.status === 'published' ? 'bg-green-100 text-green-800' : creation.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-800'}`}>{{ draft: '草稿', pending: '审核中', published: '已发布', rejected: '已驳回' }[creation.status]}</span>
                   </div>
                   <h3 className="text-xl font-semibold">{creation.book?.title || '自由创作'}</h3>
                 </div>
-                <time className="text-xs opacity-60 whitespace-nowrap">{new Date(creation.status === 'draft' ? creation.updatedAt : creation.publishedAt || creation.createdAt).toLocaleString('zh-CN')}</time>
+                <time className="text-xs opacity-60 whitespace-nowrap">{new Date(creation.status === 'draft' || creation.status === 'rejected' ? creation.updatedAt : creation.publishedAt || creation.submittedAt || creation.createdAt).toLocaleString('zh-CN')}</time>
               </div>
               <p className="text-sm text-amber-700 mb-3 break-words">{creation.prompt}</p>
               <div className="max-h-64 overflow-hidden">
                 <MarkdownContent content={creation.content} className={isDark ? '!text-gray-100' : ''} />
               </div>
+              {creation.status === 'rejected' && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">驳回原因：{creation.reviewNote || '管理员未填写原因'}</p>}
               {creation.bookId && (
-                creation.status === 'draft' ? (
+                creation.status === 'draft' || creation.status === 'rejected' ? (
                   <Link to={`/book/${creation.bookId}?tab=adapt${creation.category === 'adaptation' ? '' : `&mode=script&section=${creation.category === 'script' ? 'role' : creation.category}`}`} className="btn-secondary mt-4 inline-block">继续编辑 →</Link>
                 ) : (
                   <Link to={`/book/${creation.bookId}`} className="inline-block mt-4 text-amber-700 hover:underline">查看原书 →</Link>

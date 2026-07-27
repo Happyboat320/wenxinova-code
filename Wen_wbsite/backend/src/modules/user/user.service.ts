@@ -69,14 +69,17 @@ export async function persistCreation(data: {
   action: 'draft' | 'publish';
   draftId?: number;
 }) {
+  const author = await prisma.user.findUnique({ where: { id: data.userId }, select: { role: true } });
+  if (!author) return null;
+  const publishingStatus = author.role === 'admin' ? 'published' : 'pending';
   const draft = data.draftId
-    ? await prisma.creation.findFirst({ where: { id: data.draftId, userId: data.userId, status: 'draft' } })
+    ? await prisma.creation.findFirst({ where: { id: data.draftId, userId: data.userId, status: { in: ['draft', 'rejected'] } } })
     : await prisma.creation.findFirst({
         where: {
           userId: data.userId,
           bookId: data.bookId ?? null,
           category: data.category,
-          status: 'draft',
+          status: { in: ['draft', 'rejected'] },
         },
         orderBy: { updatedAt: 'desc' },
       });
@@ -90,8 +93,12 @@ export async function persistCreation(data: {
         prompt: data.prompt,
         content: data.content,
         category: data.category,
-        status: data.action === 'publish' ? 'published' : 'draft',
-        publishedAt: data.action === 'publish' ? new Date() : null,
+        status: data.action === 'publish' ? publishingStatus : 'draft',
+        submittedAt: data.action === 'publish' ? new Date() : null,
+        publishedAt: data.action === 'publish' && publishingStatus === 'published' ? new Date() : null,
+        reviewedAt: null,
+        reviewedById: null,
+        reviewNote: null,
       },
     });
     runSearchSync(() => syncCreationSearchDocument(creation.id), '作品已保存，但社区检索索引同步失败');
@@ -105,8 +112,9 @@ export async function persistCreation(data: {
       category: data.category,
       prompt: data.prompt,
       content: data.content,
-      status: data.action === 'publish' ? 'published' : 'draft',
-      publishedAt: data.action === 'publish' ? new Date() : null,
+      status: data.action === 'publish' ? publishingStatus : 'draft',
+      submittedAt: data.action === 'publish' ? new Date() : null,
+      publishedAt: data.action === 'publish' && publishingStatus === 'published' ? new Date() : null,
     },
   });
   runSearchSync(() => syncCreationSearchDocument(creation.id), '作品已保存，但社区检索索引同步失败');
@@ -115,9 +123,27 @@ export async function persistCreation(data: {
 
 export async function getDraft(userId: number, bookId: number, category: CreationCategory) {
   return prisma.creation.findFirst({
-    where: { userId, bookId, category, status: 'draft' },
+    where: { userId, bookId, category, status: { in: ['draft', 'rejected'] } },
     include: { book: { select: { title: true } } },
     orderBy: { updatedAt: 'desc' },
+  });
+}
+
+export async function applyForAdmin(userId: number, remark: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  if (!user) return { kind: 'missing' as const };
+  if (user.role === 'admin') return { kind: 'admin' as const };
+  const pending = await prisma.adminApplication.findFirst({ where: { userId, status: 'pending' } });
+  if (pending) return { kind: 'pending' as const, application: pending };
+  const application = await prisma.adminApplication.create({ data: { userId, remark } });
+  return { kind: 'created' as const, application };
+}
+
+export async function getLatestAdminApplication(userId: number) {
+  return prisma.adminApplication.findFirst({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, remark: true, status: true, reviewNote: true, reviewedAt: true, createdAt: true },
   });
 }
 

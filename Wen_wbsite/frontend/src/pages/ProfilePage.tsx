@@ -52,6 +52,9 @@ export default function ProfilePage() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [processingImage, setProcessingImage] = useState(false);
+  const [application, setApplication] = useState<api.AdminApplication | null>(null);
+  const [applicationRemark, setApplicationRemark] = useState('');
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -59,6 +62,26 @@ export default function ProfilePage() {
     setSignature(user.signature || '');
     setAvatar(user.avatar || null);
   }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role === 'admin') return;
+    api.getAdminApplication().then(setApplication).catch(() => {});
+  }, [user]);
+
+  const submitAdminApplication = async () => {
+    if (Array.from(applicationRemark.trim()).length < 5) {
+      toast.error('请填写至少 5 个字符的申请备注');
+      return;
+    }
+    try {
+      setApplying(true);
+      setApplication(await api.applyForAdmin(applicationRemark.trim()));
+      setApplicationRemark('');
+      toast.success('管理员申请已提交');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : '申请提交失败');
+    } finally { setApplying(false); }
+  };
 
   const selectAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -146,6 +169,16 @@ export default function ProfilePage() {
               <span className="mt-1 block text-right text-xs opacity-50">{Array.from(signature).length}/100</span>
             </label>
             <button type="submit" disabled={saving || processingImage} className="btn-primary mt-5 w-full py-3 disabled:opacity-50">{saving ? '保存中…' : '保存个人资料'}</button>
+            <div className="mt-8 border-t border-amber-100 pt-7">
+              {user.role === 'admin' ? <div className="rounded-xl bg-amber-50 p-5"><strong className="text-amber-900"><i className="fa-solid fa-shield-halved mr-2" />管理员账号</strong><p className="mt-2 text-sm text-stone-600">您可以审核社区作品和管理员申请。</p><Link to="/admin" className="btn-secondary mt-4 inline-block">进入管理审核台</Link></div> : <div>
+                <h3 className="text-lg font-semibold">申请成为管理员</h3>
+                {application?.status === 'pending' ? <p className="mt-3 rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">申请正在审核中，请耐心等待。</p> : <>
+                  {application?.status === 'rejected' && <p className="mt-3 rounded-lg bg-red-50 p-4 text-sm text-red-700">上次申请未通过：{application.reviewNote || '未填写原因'}。修改备注后可以重新申请。</p>}
+                  {application?.status === 'approved' && <p className="mt-3 rounded-lg bg-green-50 p-4 text-sm text-green-700">申请已通过，请重新登录以刷新权限。</p>}
+                  {application?.status !== 'approved' && <><textarea value={applicationRemark} maxLength={500} onChange={event => setApplicationRemark(event.target.value)} rows={4} className="mt-3 w-full resize-none rounded-xl border border-amber-200 p-3 outline-none focus:ring-2 focus:ring-amber-400" placeholder="请说明申请理由、相关经验或能够承担的审核工作（5-500 字）" /><button type="button" disabled={applying} onClick={() => void submitAdminApplication()} className="btn-secondary mt-3 disabled:opacity-50">{applying ? '提交中…' : '提交申请'}</button></>}
+                </>}
+              </div>}
+            </div>
           </form>
         ) : <div className="py-20 text-center">正在加载…</div>}
       </main>

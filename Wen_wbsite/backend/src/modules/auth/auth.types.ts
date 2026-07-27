@@ -15,6 +15,7 @@ export interface PublicUser {
   signature: string | null;
   avatar: string | null;
   status: string;
+  role: string;
   phoneVerifiedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;

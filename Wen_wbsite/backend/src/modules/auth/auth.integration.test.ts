@@ -29,6 +29,7 @@ describe('密码认证与双令牌', () => {
       "passwordHash" TEXT,
       "phoneVerifiedAt" DATETIME,
       "status" TEXT NOT NULL DEFAULT 'active',
+      "role" TEXT NOT NULL DEFAULT 'user',
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`);
