@@ -26,7 +26,8 @@ app.use(cors({
     callback(new Error('来源不在允许列表中'));
   },
 }));
-app.use(express.json({ limit: '64kb' }));
+// 个人头像由前端压缩后以 data URL 传输，其他接口仍受字段级校验限制。
+app.use(express.json({ limit: '512kb' }));
 
 // 健康检查
 app.get('/health', (req, res) => {

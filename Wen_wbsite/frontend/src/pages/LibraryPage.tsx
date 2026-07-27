@@ -150,7 +150,7 @@ const LibraryPage = () => {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                 <div className="absolute bottom-0 left-0 p-6 text-white">
                   <h3 className="text-2xl font-bold mb-1">{book.title}</h3>
-                  <p className="text-sm opacity-90">作者：{book.author}</p>
+                  {book.author.trim() && <p className="text-sm opacity-90">作者：{book.author}</p>}
                 </div>
                 <span className="absolute right-4 top-4 rounded-full bg-black/55 px-3 py-1 text-xs text-white backdrop-blur-sm">{book.category || '未分类'}</span>
               </div>

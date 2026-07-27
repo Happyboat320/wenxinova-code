@@ -11,6 +11,9 @@ export interface RequestMetadata {
 export interface PublicUser {
   id: number;
   phone: string;
+  nickname: string | null;
+  signature: string | null;
+  avatar: string | null;
   status: string;
   phoneVerifiedAt: Date | null;
   createdAt: Date;
@@ -35,4 +38,3 @@ declare global {
     }
   }
 }
-

@@ -117,6 +117,8 @@ export default function BookViewPage() {
   if (error || !bookData) return <div className="flex min-h-screen items-center justify-center bg-[#f8f5ef] text-red-700">{error || '书籍不存在'}</div>;
 
   const readingActive = activeTab !== 'adapt';
+  const requestedSection = new URLSearchParams(location.search).get('section');
+  const initialScriptSection = requestedSection === 'props' || requestedSection === 'dm' ? requestedSection : 'role';
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-stone-950 text-stone-100' : 'bg-[#f8f5ef] text-stone-800'}`}>
@@ -137,7 +139,7 @@ export default function BookViewPage() {
       <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <div className="mb-7 text-center">
           <h1 className="font-serif text-3xl font-bold text-amber-900">{bookData.title}</h1>
-          <p className="mt-2 text-stone-500">作者：{bookData.author}</p>
+          {bookData.author.trim() && <p className="mt-2 text-stone-500">作者：{bookData.author}</p>}
         </div>
 
         <div className="mb-8 flex justify-center border-b border-amber-200/70">
@@ -201,7 +203,8 @@ export default function BookViewPage() {
         ) : (
           <AdaptWorkspace bookId={bookId} title={bookData.title} author={bookData.author}
             originalText={bookData.content} characters={bookData.characters}
-            initialMode={new URLSearchParams(location.search).get('mode') === 'script' ? 'script' : 'style'} />
+            initialMode={new URLSearchParams(location.search).get('mode') === 'script' ? 'script' : 'style'}
+            initialScriptSection={initialScriptSection} />
         )}
       </main>
 

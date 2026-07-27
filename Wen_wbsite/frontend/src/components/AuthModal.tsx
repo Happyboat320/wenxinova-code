@@ -13,6 +13,7 @@ type Mode = 'login' | 'register';
 export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
   const [mode, setMode] = useState<Mode>('login');
   const [phone, setPhone] = useState('');
+  const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [code, setCode] = useState('');
@@ -25,6 +26,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
       setPassword('');
       setConfirmation('');
       setCode('');
+      setNickname('');
       setCountdown(0);
       setSubmitting(false);
     }
@@ -43,6 +45,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
     setPassword('');
     setConfirmation('');
     setCode('');
+    setNickname('');
   };
 
   const sendCode = async () => {
@@ -76,6 +79,10 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
       toast.error('两次输入的密码不一致');
       return;
     }
+    if (mode === 'register' && (Array.from(nickname.trim()).length < 2 || Array.from(nickname.trim()).length > 20)) {
+      toast.error('用户名需为 2-20 个字符');
+      return;
+    }
     if (mode === 'register' && !/^\d{4,8}$/.test(code)) {
       toast.error('请输入正确的短信验证码');
       return;
@@ -85,7 +92,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
       setSubmitting(true);
       const session = mode === 'login'
         ? await api.login(phone, password)
-        : await api.register(phone, password, code);
+        : await api.register(phone, password, code, nickname.trim());
       onAuthenticated(session);
       onClose();
       toast.success(mode === 'login' ? '登录成功' : '注册成功');
@@ -102,7 +109,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
         <div className="flex items-start justify-between px-8 pt-7">
           <div>
             <h3 id="auth-title" className="font-serif text-2xl font-semibold text-amber-900">欢迎来到文心新述</h3>
-            <p className="mt-1 text-sm text-stone-500">登录只需手机号和密码，注册需验证手机号</p>
+            <p className="mt-1 text-sm text-stone-500">登录只需手机号和密码，注册时请设置账号昵称</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700" aria-label="关闭">
             <i className="fa-solid fa-times" />
@@ -119,11 +126,19 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
         </div>
 
         <form onSubmit={submit} className="space-y-4 px-8 pb-8 pt-6">
+          {mode === 'register' && (
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium">用户名</span>
+              <input value={nickname} onChange={event => setNickname(event.target.value)}
+                className="w-full rounded-lg border border-stone-200 bg-white px-4 py-3 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                placeholder="请输入 2-20 个字符，作为账号昵称" maxLength={20} autoComplete="nickname" autoFocus />
+            </label>
+          )}
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium">手机号</span>
             <input type="tel" value={phone} onChange={event => setPhone(event.target.value.replace(/\D/g, ''))}
               className="w-full rounded-lg border border-stone-200 bg-white px-4 py-3 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
-              placeholder="请输入 11 位手机号" maxLength={11} autoComplete="tel" autoFocus />
+              placeholder="请输入 11 位手机号" maxLength={11} autoComplete="tel" autoFocus={mode === 'login'} />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium">密码</span>

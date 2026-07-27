@@ -6,6 +6,7 @@ interface AuthContextValue {
   isInitializing: boolean;
   user: User | null;
   openLogin: () => void;
+  updateUser: (user: User) => void;
   logout: () => Promise<void>;
 }
 
@@ -14,5 +15,6 @@ export const AuthContext = createContext<AuthContextValue>({
   isInitializing: true,
   user: null,
   openLogin: () => {},
+  updateUser: () => {},
   logout: async () => {},
 });

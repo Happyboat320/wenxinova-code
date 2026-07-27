@@ -17,6 +17,7 @@ interface Props {
   originalText: string;
   characters: Character[];
   initialMode?: WorkspaceMode;
+  initialScriptSection?: ScriptSection;
 }
 
 type WorkspaceMode = 'style' | 'script';
@@ -38,18 +39,25 @@ const scriptSectionCopy: Record<Exclude<ScriptSection, 'role'>, { title: string;
   },
 };
 
-export default function AdaptWorkspace({ bookId, title, author, originalText, characters, initialMode = 'style' }: Props) {
+export default function AdaptWorkspace({ bookId, title, author, originalText, characters, initialMode = 'style', initialScriptSection = 'role' }: Props) {
   const { user, openLogin } = useContext(AuthContext);
   const [mode, setMode] = useState<WorkspaceMode>(initialMode);
   const [style, setStyle] = useState(styles[0]);
   const [styleRequirement, setStyleRequirement] = useState('');
-  const [scriptSection, setScriptSection] = useState<ScriptSection>('role');
+  const [scriptSection, setScriptSection] = useState<ScriptSection>(initialScriptSection);
   const [selectedCharacter, setSelectedCharacter] = useState(characters[0]?.name || '主角');
   const [generatedCharacters, setGeneratedCharacters] = useState<Character[]>([]);
   const [analyzingCharacters, setAnalyzingCharacters] = useState(false);
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
+  const [continuing, setContinuing] = useState(false);
+  const [continuationDialogOpen, setContinuationDialogOpen] = useState(false);
+  const [continuationRequirement, setContinuationRequirement] = useState('');
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftId, setDraftId] = useState<number | undefined>();
+  const [persistedVersion, setPersistedVersion] = useState<{ status: 'draft' | 'published'; content: string } | null>(null);
 
   const roleOptions = generatedCharacters.length > 0 ? generatedCharacters : characters;
 
@@ -74,6 +82,29 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
   const creationCategory: api.CreationCategory = mode === 'style'
     ? 'adaptation'
     : scriptSection === 'role' ? 'script' : scriptSection;
+
+  useEffect(() => {
+    if (!user) {
+      setDraftId(undefined);
+      return;
+    }
+    let cancelled = false;
+    setDraftLoading(true);
+    api.getDraft(bookId, creationCategory)
+      .then(draft => {
+        if (cancelled) return;
+        setDraftId(draft?.id);
+        setResult(draft?.content || '');
+        setPersistedVersion(draft ? { status: 'draft', content: draft.content } : null);
+      })
+      .catch(caught => {
+        if (!cancelled) toast.error(caught instanceof Error ? caught.message : '草稿恢复失败');
+      })
+      .finally(() => {
+        if (!cancelled) setDraftLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [bookId, creationCategory, user]);
 
   const generate = async () => {
     if (!user) {
@@ -124,20 +155,66 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
     }
   };
 
-  const save = async () => {
+  const continueWriting = async (requirement = '') => {
+    if (!user) {
+      toast.error('请先登录后使用 AI 续写');
+      openLogin();
+      return;
+    }
+    if (!result.trim()) {
+      toast.error('请先生成或输入需要续写的内容');
+      return;
+    }
+    try {
+      setContinuing(true);
+      setContinuationDialogOpen(false);
+      const continuation = await api.adaptBook(
+        // 仅传递末尾上下文，避免多次续写后请求体超限。
+        result.slice(-12000),
+        'continue',
+        requirement.trim() || '根据上文自由续写，保持文风和情节连贯',
+      );
+      setResult(current => `${current.trimEnd()}\n\n${continuation.trimStart()}`);
+      setContinuationRequirement('');
+      toast.success('续写内容已追加');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : '续写失败');
+    } finally {
+      setContinuing(false);
+    }
+  };
+
+  const persist = async (action: 'draft' | 'publish') => {
     if (!user) {
       openLogin();
       return;
     }
     if (!result.trim()) return;
     try {
-      setSaving(true);
-      await api.saveCreation({ bookId, category: creationCategory, prompt: request.prompt, content: result });
-      toast.success('已保存到“我的创作”，并展示在社区');
+      if (action === 'draft') setSaving(true);
+      else setPublishing(true);
+      const creation = await api.saveCreation({
+        bookId,
+        category: creationCategory,
+        prompt: request.prompt,
+        content: result,
+        action,
+        draftId,
+      });
+      if (action === 'draft') {
+        setDraftId(creation.id);
+        setPersistedVersion({ status: 'draft', content: creation.content });
+        toast.success('已保存到“我的创作 · 草稿”');
+      } else {
+        setDraftId(undefined);
+        setPersistedVersion({ status: 'published', content: creation.content });
+        toast.success('已发布到 UGC 社区');
+      }
     } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : '保存失败');
+      toast.error(caught instanceof Error ? caught.message : action === 'draft' ? '保存失败' : '发布失败');
     } finally {
-      setSaving(false);
+      if (action === 'draft') setSaving(false);
+      else setPublishing(false);
     }
   };
 
@@ -156,12 +233,15 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
   const outputTitle = mode === 'style'
     ? `${style}风格改编`
     : scriptSection === 'role' ? `${selectedCharacter} · 角色剧本` : scriptSectionCopy[scriptSection].title;
+  const contentUnchanged = persistedVersion?.content === result.trim();
 
   return (
     <div className="mx-auto max-w-[1440px]">
       <div className="mb-7 text-center">
         <h2 className="title-serif text-3xl">{title} - {mode === 'style' ? '风格化改编' : '剧本杀创作'}</h2>
-        <p className="mt-1 text-gray-500">{mode === 'style' ? `作者：${author}` : '将经典名著改编为互动剧本杀体验'}</p>
+        {(mode !== 'style' || author.trim()) && (
+          <p className="mt-1 text-gray-500">{mode === 'style' ? `作者：${author}` : '将经典名著改编为互动剧本杀体验'}</p>
+        )}
         <div className="mt-5 inline-flex rounded-lg border border-amber-200 bg-white p-1">
           <button className={`rounded-md px-5 py-2 ${mode === 'style' ? 'bg-amber-700 text-white' : 'text-amber-800'}`} onClick={() => { setMode('style'); setResult(''); }}>风格化改编</button>
           <button className={`rounded-md px-5 py-2 ${mode === 'script' ? 'bg-amber-700 text-white' : 'text-amber-800'}`} onClick={() => { setMode('script'); setResult(''); }}>剧本杀创作</button>
@@ -171,7 +251,19 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
       {mode === 'style' ? (
         <div className="grid gap-6 lg:grid-cols-[minmax(260px,0.85fr)_minmax(380px,1.2fr)_minmax(220px,0.65fr)]">
           <OriginalPanel className={panel} text={originalText} />
-          <OutputPanel className={panel} title={outputTitle} result={result} onChange={setResult} loading={loading} onGenerate={generate} />
+          <OutputPanel
+            className={panel}
+            title={outputTitle}
+            result={result}
+            onChange={setResult}
+            loading={loading}
+            onGenerate={generate}
+            continuation={{
+              loading: continuing,
+              onFree: () => void continueWriting(),
+              onCustom: () => setContinuationDialogOpen(true),
+            }}
+          />
           <section className={`${panel} p-6`}>
             <h3 className="mb-4 text-xl font-medium"><i className="fa-solid fa-palette mr-2 text-amber-700" />风格选项</h3>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
@@ -212,9 +304,48 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
       )}
 
       <div className="mt-6 flex justify-center gap-4">
-        <button onClick={save} disabled={!result.trim() || saving} className="btn-secondary min-w-40 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-floppy-disk mr-2" />{saving ? '保存中...' : '保存并发布'}</button>
+        <button onClick={() => void persist('draft')} disabled={!result.trim() || saving || publishing || draftLoading || Boolean(contentUnchanged)} className="btn-secondary min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-floppy-disk mr-2" />{saving ? '保存中...' : '保存'}</button>
+        <button onClick={() => void persist('publish')} disabled={!result.trim() || saving || publishing || draftLoading || (persistedVersion?.status === 'published' && contentUnchanged)} className="btn-primary min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-paper-plane mr-2" />{publishing ? '发布中...' : '发布'}</button>
         <button onClick={exportResult} disabled={!result.trim()} className="btn-secondary min-w-40 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-download mr-2" />导出</button>
       </div>
+
+      {continuationDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onMouseDown={() => setContinuationDialogOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="continuation-dialog-title"
+            className="w-full max-w-xl rounded-2xl bg-white p-7 text-gray-800 shadow-2xl"
+            onMouseDown={event => event.stopPropagation()}>
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 id="continuation-dialog-title" className="title-serif text-2xl">输入续写要求</h3>
+                <p className="mt-1 text-sm text-gray-500">AI 会承接当前内容，按你的情节、人物或篇幅要求续写</p>
+              </div>
+              <button type="button" aria-label="关闭" onClick={() => setContinuationDialogOpen(false)} className="rounded-lg px-3 py-1.5 text-gray-500 hover:bg-gray-100"><i className="fa-solid fa-xmark" /></button>
+            </div>
+            <textarea
+              autoFocus
+              value={continuationRequirement}
+              maxLength={1000}
+              onChange={event => setContinuationRequirement(event.target.value)}
+              rows={7}
+              className="w-full resize-none rounded-xl border border-amber-200 p-4 leading-7 outline-none focus:ring-2 focus:ring-amber-400"
+              placeholder="例如：让主角在雨夜发现新线索，加强悬疑氛围，续写约 1000 字……"
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" onClick={() => setContinuationDialogOpen(false)} className="btn-secondary">取消</button>
+              <button
+                type="button"
+                disabled={!continuationRequirement.trim() || continuing}
+                onClick={() => void continueWriting(continuationRequirement)}
+                className="btn-primary min-w-32 disabled:cursor-not-allowed disabled:opacity-50">
+                {continuing ? '续写中…' : '开始续写'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -223,8 +354,17 @@ function OriginalPanel({ className, text }: { className: string; text: string })
   return <section className={`${className} p-6`}><h3 className="mb-4 text-xl font-medium"><i className="fa-solid fa-bookmark mr-2 text-amber-700" />原文</h3><div className="h-[620px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-amber-200 p-5 font-serif text-lg leading-8">{text || '暂无原文'}</div></section>;
 }
 
-function OutputPanel({ className, title, result, onChange, loading, onGenerate }: { className: string; title: string; result: string; onChange: (value: string) => void; loading: boolean; onGenerate: () => void }) {
+function OutputPanel({ className, title, result, onChange, loading, onGenerate, continuation }: {
+  className: string;
+  title: string;
+  result: string;
+  onChange: (value: string) => void;
+  loading: boolean;
+  onGenerate: () => void;
+  continuation?: { loading: boolean; onFree: () => void; onCustom: () => void };
+}) {
   const [preview, setPreview] = useState(false);
+  const [continuationMenuOpen, setContinuationMenuOpen] = useState(false);
 
   return (
     <section className={`${className} p-6`}>
@@ -244,6 +384,24 @@ function OutputPanel({ className, title, result, onChange, loading, onGenerate }
         </div>
       ) : (
         <textarea value={result} onChange={event => onChange(event.target.value)} className="h-[620px] w-full resize-none rounded-lg border border-gray-200 p-5 leading-8 focus:outline-none focus:ring-2 focus:ring-amber-400" placeholder={loading ? 'AI 正在创作，请稍候…' : '生成的内容将显示在这里，生成后可以继续编辑…'} />
+      )}
+      {continuation && (
+        <div className="relative mt-4 flex justify-center">
+          <button
+            type="button"
+            disabled={!result.trim() || loading || continuation.loading}
+            onClick={() => setContinuationMenuOpen(open => !open)}
+            className="btn-primary min-w-36 disabled:cursor-not-allowed disabled:opacity-40">
+            <i className="fa-solid fa-feather-pointed mr-2" />{continuation.loading ? '续写中…' : '续写'}
+            {!continuation.loading && <i className={`fa-solid fa-chevron-${continuationMenuOpen ? 'up' : 'down'} ml-2 text-xs`} />}
+          </button>
+          {continuationMenuOpen && !continuation.loading && (
+            <div className="absolute bottom-full z-20 mb-2 w-52 overflow-hidden rounded-xl border border-amber-200 bg-white p-2 shadow-xl">
+              <button type="button" onClick={() => { setContinuationMenuOpen(false); continuation.onFree(); }} className="w-full rounded-lg px-4 py-3 text-left text-sm hover:bg-amber-50"><i className="fa-solid fa-wand-magic-sparkles mr-2 text-amber-700" />AI 自由续写</button>
+              <button type="button" onClick={() => { setContinuationMenuOpen(false); continuation.onCustom(); }} className="w-full rounded-lg px-4 py-3 text-left text-sm hover:bg-amber-50"><i className="fa-solid fa-pen mr-2 text-amber-700" />我有续写要求</button>
+            </div>
+          )}
+        </div>
       )}
     </section>
   );

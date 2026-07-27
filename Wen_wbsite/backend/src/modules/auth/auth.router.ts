@@ -93,9 +93,13 @@ authRouter.post('/register', async (req, res) => {
   try {
     const { phone, password } = readCredentials(req);
     const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    const nickname = authService.normalizeNickname(typeof req.body?.nickname === 'string' ? req.body.nickname : '');
     if (!authService.CODE_PATTERN.test(code)) throw new AuthError('请输入正确的验证码', 400, 'INVALID_SMS_CODE');
+    if (!authService.isValidNickname(nickname)) {
+      throw new AuthError(`用户名需为 ${authService.NICKNAME_MIN_LENGTH}-${authService.NICKNAME_MAX_LENGTH} 个字符，且不能包含特殊符号`, 400, 'INVALID_NICKNAME');
+    }
     consumeLimit(`register:ip:${req.ip}`, 10, 60 * 60_000);
-    const result = await authService.register(phone, password, code, metadata(req));
+    const result = await authService.register(phone, password, code, nickname, metadata(req));
     setRefreshCookie(res, result.refreshToken, result.refreshExpiresIn);
     res.status(201).json(success({ accessToken: result.accessToken, expiresIn: result.expiresIn, user: result.user }, '注册成功'));
   } catch (caught) {

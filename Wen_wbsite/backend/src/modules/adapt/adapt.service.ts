@@ -3,11 +3,13 @@ import * as deepseek from '../../lib/deepseek.js';
 /**
  * 书籍改编与创作入口
  * @param translation 原文或译文内容
- * @param type 类型：adapt(改编), creative(创作), script(剧本杀), custom(自定义)
+ * @param type 类型：adapt(改编), creative(创作), continue(续写), script(剧本杀), custom(自定义)
  * @param prompt 提示词或角色名(剧本杀)
  */
 export async function adaptBook(translation: string, type: string, prompt: string) {
   switch (type) {
+    case 'continue':
+      return deepseek.continueWriting(translation, prompt);
     case 'creative':
       return deepseek.creativeWrite(translation, prompt);
     case 'script':

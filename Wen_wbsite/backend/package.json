@@ -15,7 +15,7 @@
     "import:excel": "tsx scripts/import-excel.ts",
     "import:text": "tsx scripts/import-text.ts",
     "import:json": "tsx scripts/import-json.ts",
-    "import:all": "tsx scripts/import-excel.ts --clear && tsx scripts/import-text.ts",
+    "import:all": "prisma migrate deploy && tsx scripts/import-all.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

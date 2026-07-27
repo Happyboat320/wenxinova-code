@@ -11,6 +11,7 @@ import { Toaster } from 'sonner';
 import type { User } from '@/api';
 import * as api from '@/api';
 import AuthModal from '@/components/AuthModal';
+import ProfilePage from '@/pages/ProfilePage';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -41,7 +42,7 @@ function App() {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated: Boolean(user), isInitializing, user, openLogin: () => setLoginOpen(true), logout }}
+      value={{ isAuthenticated: Boolean(user), isInitializing, user, openLogin: () => setLoginOpen(true), updateUser: setUser, logout }}
     >
       <Routes>
         <Route path="/" element={<Home />} />
@@ -53,6 +54,7 @@ function App() {
         <Route path="/classical-library/:id/ai-adapt" element={<AdaptPage />} />
         <Route path="/ugc-community" element={<UGCCommunityPage />} />
         <Route path="/my-collection" element={<MyCollectionPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Routes>
       <Toaster />
       <AuthModal

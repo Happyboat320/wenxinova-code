@@ -15,11 +15,28 @@ export const PHONE_PATTERN = /^1[3-9]\d{9}$/;
 export const CODE_PATTERN = /^\d{4,8}$/;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_BYTES = 72;
+export const NICKNAME_MIN_LENGTH = 2;
+export const NICKNAME_MAX_LENGTH = 20;
+
+export function normalizeNickname(value: string): string {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+export function isValidNickname(value: string): boolean {
+  const normalized = normalizeNickname(value);
+  const length = Array.from(normalized).length;
+  return length >= NICKNAME_MIN_LENGTH
+    && length <= NICKNAME_MAX_LENGTH
+    && !/[<>\u0000-\u001f\u007f]/u.test(normalized);
+}
 
 export function toPublicUser(user: PublicUser): PublicUser {
   return {
     id: user.id,
     phone: user.phone,
+    nickname: user.nickname,
+    signature: user.signature,
+    avatar: user.avatar,
     status: user.status,
     phoneVerifiedAt: user.phoneVerifiedAt,
     createdAt: user.createdAt,
@@ -60,7 +77,7 @@ async function issueSession(user: PublicUser, metadata: RequestMetadata) {
   return { accessToken: access.token, expiresIn: access.expiresIn, refreshToken: refresh.token, refreshExpiresIn: refresh.expiresIn, user: toPublicUser(user) };
 }
 
-export async function register(phone: string, password: string, code: string, metadata: RequestMetadata) {
+export async function register(phone: string, password: string, code: string, nickname: string, metadata: RequestMetadata) {
   const verified = await checkVerifyCode(phone, code);
   if (!verified) throw new AuthError('验证码错误或已过期', 400, 'INVALID_SMS_CODE');
 
@@ -71,8 +88,8 @@ export async function register(phone: string, password: string, code: string, me
   try {
     const now = new Date();
     const user = existing
-      ? await prisma.user.update({ where: { id: existing.id }, data: { passwordHash, phoneVerifiedAt: now } })
-      : await prisma.user.create({ data: { phone, passwordHash, phoneVerifiedAt: now } });
+      ? await prisma.user.update({ where: { id: existing.id }, data: { passwordHash, phoneVerifiedAt: now, nickname } })
+      : await prisma.user.create({ data: { phone, passwordHash, phoneVerifiedAt: now, nickname } });
     if (existing) await prisma.refreshSession.updateMany({ where: { userId: existing.id, revokedAt: null }, data: { revokedAt: now } });
     console.info(`密码注册成功: ${phone.slice(0, 3)}****${phone.slice(-4)}`);
     return await issueSession(user, metadata);

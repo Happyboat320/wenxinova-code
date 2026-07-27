@@ -1,285 +1,227 @@
-import { useEffect, useRef, useContext } from "react";
+import { useContext, useEffect, useRef, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
 import { AuthContext } from "@/contexts/authContext";
 
+const coverFiles = [
+    "三言（警世通言 喻世明言 醒世恒言 ）.png", "唐五代笔记小说.png", "明代笔记小说.png",
+    "搜神记.png", "唐五代志怪传奇序录封面.png", "明清传奇.png", "封面.png", "清平山堂话本.png",
+    "汉魏六朝笔记小说.png", "官场现形记.png", "清代笔记小说.png", "宋元笔记小说.png",
+    "孤本小说集.png", "宋元明话本.png", "唐宋传奇.png", "二拍封面.png", "宋元小说话本.png", "唐宋传奇选封面.png"
+];
+
+const buildOrbit = (count: number, offset: number) => Array.from(
+    { length: count },
+    (_, index) => coverFiles[(offset + index * 5) % coverFiles.length]
+);
+
+function CoverOrbit({
+    files,
+    radius,
+    duration,
+    depth,
+    angleOffset = 0,
+    reverse = false
+}: {
+    files: string[];
+    radius: string;
+    duration: number;
+    depth: 1 | 2 | 3 | 4;
+    angleOffset?: number;
+    reverse?: boolean;
+}) {
+    return (
+        <ul className={`home-cover-orbit depth-${depth}${reverse ? " is-reverse" : ""}`} style={{ "--orbit-duration": `${duration}s` } as CSSProperties}>
+            {files.map((file, index) => (
+                <li
+                    key={`${depth}-${index}-${file}`}
+                    className="home-cover-position"
+                    style={{ "--cover-angle": `${angleOffset + index * 360 / files.length}deg`, "--cover-radius": radius } as CSSProperties}
+                >
+                    <span className="home-cover-float" style={{ "--float-delay": `${-index * 0.43}s` } as CSSProperties}>
+                        <img src={`/home-covers/${encodeURIComponent(file)}`} alt="" />
+                    </span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+function HomeBackground() {
+    return (
+        <div className="home-orbit-background" aria-hidden="true">
+            <div className="home-paper-texture" />
+            <div className="home-concentric-disc">
+                <div className="home-disc-rings" />
+                <div className="home-depth-ring ring-1" />
+                <div className="home-depth-ring ring-2" />
+                <div className="home-depth-ring ring-3" />
+                <div className="home-depth-ring ring-4" />
+                <CoverOrbit files={buildOrbit(48, 0)} radius="-52vw" duration={190} depth={1} angleOffset={2} />
+                <CoverOrbit files={buildOrbit(44, 7)} radius="-43vw" duration={164} depth={2} angleOffset={-4} reverse />
+                <CoverOrbit files={buildOrbit(40, 13)} radius="-34vw" duration={140} depth={3} angleOffset={6} />
+                <CoverOrbit files={buildOrbit(36, 3)} radius="-25vw" duration={118} depth={4} angleOffset={-8} reverse />
+            </div>
+        </div>
+    );
+}
+
+const featureItems = [
+    ["bg-amber-100", "fa-language", "text-amber-800", "高保真文白转换", "确保翻译后的白话文流畅且不失原文神韵"],
+    ["bg-red-100", "fa-paint-brush", "text-red-800", "可控的风格化改编", "实现用户指定风格（如悬疑、喜剧）的稳定输出"],
+    ["bg-blue-100", "fa-mask", "text-blue-800", "分角色单视角故事", "生成符合人物叙述视角的限知故事，提升阅读沉浸感"],
+    ["bg-green-100", "fa-random", "text-green-800", "符合逻辑的分支情节", "生成既出人意料又合乎原作文本逻辑的新情节"]
+];
+
 export default function Home() {
     const navigate = useNavigate();
-
-    const {
-        isDark
-    } = useTheme();
-
-    const {
-        isAuthenticated,
-        user,
-        openLogin,
-        logout
-    } = useContext(AuthContext);
-
+    const { isDark } = useTheme();
+    const { isAuthenticated, user, openLogin, logout } = useContext(AuthContext);
     const appRef = useRef<HTMLDivElement>(null);
+    const cardsRef = useRef<HTMLElement>(null);
+    const shouldReduceMotion = useReducedMotion();
 
-    useEffect(() => {
-        if (appRef.current) {
-            appRef.current.classList.add("fade-in");
-        }
-    }, []);
-
-    const handleNavigate = (path: string) => {
-        navigate(path);
-    };
+    useEffect(() => { appRef.current?.classList.add("fade-in"); }, []);
 
     const containerVariants = {
-        hidden: {
-            opacity: 0
-        },
-
-        visible: {
-            opacity: 1,
-
-            transition: {
-                staggerChildren: 0.2,
-                delayChildren: 0.3
-            }
-        }
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { staggerChildren: 0.2, delayChildren: 0.3 } }
+    };
+    const itemVariants = {
+        hidden: { y: 20, opacity: 0 },
+        visible: { y: 0, opacity: 1, transition: { duration: 0.6, ease: "easeOut" as const } }
     };
 
-    const itemVariants = {
-        hidden: {
-            y: 20,
-            opacity: 0
-        },
+    const cards = [
+        { path: "/classical-library", accent: "bg-amber-100", icon: "fa-scroll text-amber-800", title: "古典文库", description: "浏览四大名著及经典古籍，感受中华文化的博大精深", action: "开始探索" },
+        { path: "/ugc-community", accent: "bg-red-100", icon: "fa-users text-red-800", title: "UGC社区", description: "分享您的创意改编，发现他人的精彩作品，共同创作经典新篇", action: "加入社区" },
+        { path: "/my-collection", accent: "bg-blue-100", icon: "fa-bookmark text-blue-800", title: "我的创作", description: "管理您的改编作品，查看收藏的经典片段，继续未完成的创作", action: "我的作品" }
+    ];
 
-        visible: {
-            y: 0,
-            opacity: 1,
-
-            transition: {
-                duration: 0.6,
-                ease: "easeOut" as const
-            }
-        }
+    const scrollToSection = (section: HTMLElement | null) => {
+        section?.scrollIntoView({ behavior: shouldReduceMotion ? "auto" : "smooth", block: "start" });
     };
 
     return (
-        <div
-            ref={appRef}
-            className={`min-h-screen min-w-[1440px] flex flex-col items-center justify-center p-8 ${isDark ? "bg-gray-900 text-gray-100" : "bg-[#F9F6F0] text-gray-800"}`}>
-            {}
-            <header
-                className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center">
+        <div ref={appRef} className={`home-orbit-page h-screen min-w-[1440px] ${isDark ? "text-gray-100" : "text-gray-800"}`}>
+            <HomeBackground />
+            <header className="home-site-header home-foreground fixed top-0 left-0 right-0 p-6 flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                     <i className="fa-solid fa-book-open text-amber-800 text-2xl"></i>
-                <h1 className="text-2xl title-serif">文心新述</h1>
-            </div>
-                {isAuthenticated ? <div className="flex items-center gap-4">
-                    <div
-                        className="w-8 h-8 rounded-full bg-amber-200 flex items-center justify-center text-amber-800">
-                        <i className="fa-solid fa-user"></i>
-                    </div>
-                    <span className="text-sm opacity-70">{user?.phone}</span>
-                    <button
-                        onClick={logout}
-                        className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors">退出
-                                            </button>
-                </div> : <button
-                    onClick={openLogin}
-                    className="px-4 py-2 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-colors">登录
-                                    </button>}
-            </header>
-            {}
-            <motion.div
-                className="w-full max-w-6xl"
-                initial="hidden"
-                animate="visible"
-                variants={containerVariants}>
-                {}
-                <motion.div className="text-center mb-16" variants={itemVariants}>
-                    <h2 className="text-4xl md:text-5xl title-serif mb-4">智能古典文学改编平台</h2>
-                    <p className="text-lg md:text-xl max-w-3xl mx-auto opacity-80">探索古典文学的无限可能，AI助力您创作出独特魅力的现代演绎
-                                                          </p>
-                </motion.div>
-                {}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {}
-                    <motion.div
-                        className="book-card relative overflow-hidden group"
-                        variants={itemVariants}
-                        whileHover={{
-                            y: -10,
-
-                            transition: {
-                                duration: 0.3
-                            }
-                        }}
-                        onClick={() => handleNavigate("/classical-library")}>
-                        <div
-                            className="absolute top-0 right-0 w-24 h-24 bg-amber-100 rounded-full -translate-y-12 translate-x-12 opacity-70 group-hover:scale-150 transition-transform duration-700 ease-out"></div>
-                        <div className="relative z-10">
-                            <div className="mb-6 flex justify-center">
-                                <div
-                                    className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center">
-                                    <i className="fa-solid fa-scroll text-amber-800 text-3xl"></i>
-                                </div>
-                            </div>
-                            <h3 className="text-2xl title-serif text-center mb-3">古典文库</h3>
-                            <p className="text-center mb-6 opacity-80">浏览四大名著及经典古籍，感受中华文化的博大精深
-                                                                              </p>
-                            <button className="w-full btn-primary flex items-center justify-center gap-2">
-                                <span>开始探索</span>
-                                <i className="fa-solid fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </motion.div>
-                    {}
-                    <motion.div
-                        className="book-card relative overflow-hidden group"
-                        variants={itemVariants}
-                        whileHover={{
-                            y: -10,
-
-                            transition: {
-                                duration: 0.3
-                            }
-                        }}
-                        onClick={() => handleNavigate("/ugc-community")}>
-                        <div
-                            className="absolute top-0 right-0 w-24 h-24 bg-red-100 rounded-full -translate-y-12 translate-x-12 opacity-70 group-hover:scale-150 transition-transform duration-700 ease-out"></div>
-                        <div className="relative z-10">
-                            <div className="mb-6 flex justify-center">
-                                <div
-                                    className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center">
-                                    <i className="fa-solid fa-users text-red-800 text-3xl"></i>
-                                </div>
-                            </div>
-                            <h3 className="text-2xl title-serif text-center mb-3">UGC社区</h3>
-                            <p className="text-center mb-6 opacity-80">分享您的创意改编，发现他人的精彩作品，共同创作经典新篇
-                                                                              </p>
-                            <button className="w-full btn-primary flex items-center justify-center gap-2">
-                                <span>加入社区</span>
-                                <i className="fa-solid fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </motion.div>
-                    {}
-                    <motion.div
-                        className="book-card relative overflow-hidden group"
-                        variants={itemVariants}
-                        whileHover={{
-                            y: -10,
-
-                            transition: {
-                                duration: 0.3
-                            }
-                        }}
-                        onClick={() => handleNavigate("/my-collection")}>
-                        <div
-                            className="absolute top-0 right-0 w-24 h-24 bg-blue-100 rounded-full -translate-y-12 translate-x-12 opacity-70 group-hover:scale-150 transition-transform duration-700 ease-out"></div>
-                        <div className="relative z-10">
-                            <div className="mb-6 flex justify-center">
-                                <div
-                                    className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
-                                    <i className="fa-solid fa-bookmark text-blue-800 text-3xl"></i>
-                                </div>
-                            </div>
-                            <h3 className="text-2xl title-serif text-center mb-3">我的创作</h3>
-                            <p className="text-center mb-6 opacity-80">管理您的改编作品，查看收藏的经典片段，继续未完成的创作
-                                                                              </p>
-                            <button className="w-full btn-primary flex items-center justify-center gap-2">
-                                <span>我的作品</span>
-                                <i className="fa-solid fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </motion.div>
+                    <i className="fa-solid fa-book-open text-amber-800 text-2xl" />
+                    <h1 className="text-2xl title-serif">文心新述</h1>
                 </div>
-                {}
+                {isAuthenticated ? <div className="flex items-center gap-4">
+                    <button type="button" onClick={() => navigate('/profile')} className="flex items-center gap-3 rounded-full px-2 py-1 transition hover:bg-amber-50" aria-label="编辑个人资料">
+                        <span className="w-9 h-9 overflow-hidden rounded-full bg-amber-200 flex items-center justify-center text-amber-800">
+                            {user?.avatar ? <img src={user.avatar} alt="" className="h-full w-full object-cover" /> : (user?.nickname?.charAt(0) || <i className="fa-solid fa-user" />)}
+                        </span>
+                        <span className="max-w-32 truncate text-sm opacity-70">{user?.nickname || '未设置昵称'}</span>
+                    </button>
+                    <button onClick={logout} className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors">退出</button>
+                </div> : <button onClick={openLogin} className="px-4 py-2 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-colors">登录</button>}
+            </header>
+
+            <section className="home-scroll-section home-hero-section">
+                <motion.div className="home-foreground home-hero-panel w-full max-w-6xl text-center" initial="hidden" animate="visible" variants={containerVariants}>
+                    <motion.p className="home-hero-kicker" variants={itemVariants}>古典新生 · 智启文心</motion.p>
+                    <motion.h2 className="home-hero-title title-serif" variants={itemVariants}>智能古典文学改编平台</motion.h2>
+                    <motion.p className="home-hero-copy" variants={itemVariants}>探索古典文学的无限可能，AI 助力您创作独具魅力的现代演绎</motion.p>
+                    <motion.form className="home-search-shell" variants={itemVariants} onSubmit={(event) => event.preventDefault()} role="search">
+                        <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+                        <input type="search" aria-label="检索古典文学内容" placeholder="检索古典作品、人物或主题……" />
+                        <button type="submit" aria-label="检索功能即将开放" title="检索功能即将开放">检索</button>
+                    </motion.form>
+                </motion.div>
+                <motion.button
+                    type="button"
+                    className="home-scroll-cue home-foreground"
+                    onClick={() => scrollToSection(cardsRef.current)}
+                    aria-label="向下查看核心功能"
+                    animate={shouldReduceMotion ? undefined : { y: [0, 9, 0] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                >
+                    <span>向下探索</span>
+                    <i className="fa-solid fa-chevron-down" />
+                </motion.button>
+            </section>
+
+            <section ref={cardsRef} className="home-scroll-section home-cards-section">
                 <motion.div
-                    className="mt-24 grid grid-cols-1 md:grid-cols-2 gap-12"
-                    variants={itemVariants}>
-                    <div
-                        className="bg-white bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 shadow-lg">
-                        <h3 className="text-2xl title-serif mb-4">智能改编特色</h3>
+                    className="home-foreground w-full max-w-6xl"
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, amount: 0.35 }}
+                    variants={containerVariants}
+                >
+                    <motion.div className="home-section-heading" variants={itemVariants}>
+                        <p>CORE FUNCTIONS</p>
+                        <h2 className="title-serif">三大核心功能</h2>
+                        <span>从典籍阅读，到灵感创作，再到作品沉淀</span>
+                    </motion.div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {cards.map((card) => <motion.div
+                        key={card.path}
+                        className="book-card home-function-card relative overflow-hidden group"
+                        variants={itemVariants}
+                        whileHover={{ y: -10, transition: { duration: 0.3 } }}
+                        onClick={() => navigate(card.path)}
+                    >
+                        <div className={`absolute top-0 right-0 w-24 h-24 ${card.accent} rounded-full -translate-y-12 translate-x-12 opacity-70 group-hover:scale-150 transition-transform duration-700 ease-out`} />
+                        <div className="relative z-10">
+                            <div className="mb-6 flex justify-center"><div className={`w-20 h-20 rounded-full ${card.accent} flex items-center justify-center`}><i className={`fa-solid ${card.icon} text-3xl`} /></div></div>
+                            <h3 className="text-2xl title-serif text-center mb-3">{card.title}</h3>
+                            <p className="text-center mb-6 opacity-80">{card.description}</p>
+                            <button className="w-full btn-primary flex items-center justify-center gap-2"><span>{card.action}</span><i className="fa-solid fa-arrow-right" /></button>
+                        </div>
+                    </motion.div>)}
+                    </div>
+                </motion.div>
+            </section>
+
+            <section className="home-scroll-section home-features-section">
+                <motion.div
+                    className="home-foreground w-full max-w-6xl"
+                    initial={{ opacity: 0, y: 56 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.3 }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                >
+                    <div className="home-section-heading">
+                        <p>INTELLIGENT ADAPTATION</p>
+                        <h2 className="title-serif">智能改编特色</h2>
+                        <span>让技术理解古典，也让创作保有温度</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                    <div className="home-feature-card bg-white bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 shadow-lg">
                         <ul className="space-y-4">
-                            <li className="flex items-start gap-3">
-                                <div
-                                    className="mt-1 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                                    <i className="fa-solid fa-language text-amber-800"></i>
-                                </div>
-                                <div>
-                                    <h4 className="font-medium mb-1">高保真文白转换</h4>
-                                    <p className="text-sm opacity-80">确保翻译后的白话文流畅且不失原文神韵</p>
-                                </div>
-                            </li>
-                            <li className="flex items-start gap-3">
-                                <div
-                                    className="mt-1 w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                                    <i className="fa-solid fa-paint-brush text-red-800"></i>
-                                </div>
-                                <div>
-                                    <h4 className="font-medium mb-1">可控的风格化改编</h4>
-                                    <p className="text-sm opacity-80">实现用户指定风格（如悬疑、喜剧）的稳定输出</p>
-                                </div>
-                            </li>
-                            <li className="flex items-start gap-3">
-                                <div
-                                    className="mt-1 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                    <i className="fa-solid fa-mask text-blue-800"></i>
-                                </div>
-                                <div>
-                                    <h4 className="font-medium mb-1">分角色单视角故事</h4>
-                                    <p className="text-sm opacity-80">生成符合人物叙述视角的限知故事，提升阅读沉浸感</p>
-                                </div>
-                            </li>
-                            <li className="flex items-start gap-3">
-                                <div
-                                    className="mt-1 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                                    <i className="fa-solid fa-random text-green-800"></i>
-                                </div>
-                                <div>
-                                    <h4 className="font-medium mb-1">符合逻辑的分支情节</h4>
-                                    <p className="text-sm opacity-80">生成既出人意料又合乎原作文本逻辑的新情节</p>
-                                </div>
-                            </li>
+                            {featureItems.map(([bg, icon, color, title, text], index) => <motion.li
+                                key={title}
+                                className="flex items-start gap-3"
+                                initial={{ opacity: 0, x: -24 }}
+                                whileInView={{ opacity: 1, x: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ duration: 0.45, delay: index * 0.12 }}
+                            >
+                                <div className={`mt-1 w-8 h-8 rounded-full ${bg} flex items-center justify-center flex-shrink-0`}><i className={`fa-solid ${icon} ${color}`} /></div>
+                                <div><h4 className="font-medium mb-1">{title}</h4><p className="text-sm opacity-80">{text}</p></div>
+                            </motion.li>)}
                         </ul>
                     </div>
                     <div className="flex items-center justify-center">
                         <div className="relative">
-                            <motion.div
-                                className="w-64 h-64 bg-amber-100 rounded-full opacity-50 absolute -top-10 -right-10 floating"
-                                animate={{
-                                    scale: [1, 1.1, 1],
-                                    opacity: [0.5, 0.7, 0.5]
-                                }}
-                                transition={{
-                                    duration: 6,
-                                    repeat: Infinity
-                                }} />
-                            <motion.div
-                                className="w-96 h-96 bg-red-100 rounded-full opacity-30 absolute -bottom-10 -left-10 floating"
-                                animate={{
-                                    scale: [1, 1.2, 1],
-                                    opacity: [0.3, 0.5, 0.3]
-                                }}
-                                transition={{
-                                    duration: 8,
-                                    repeat: Infinity,
-                                    delay: 1
-                                }} />
-                            <img
-                                src="https://space.coze.cn/api/coze_space/gen_image?image_size=landscape_4_3&prompt=chinese%20ancient%20scroll%20with%20calligraphy%20and%20painting%20art&sign=dc6a09330f9f8db14739b4c78d0105fb"
-                                alt="古籍展示"
-                                className="w-full h-auto rounded-xl shadow-2xl relative z-10 transform rotate-2 book-shadow" />
+                            <motion.div className="w-64 h-64 bg-amber-100 rounded-full opacity-50 absolute -top-10 -right-10 floating" animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.7, 0.5] }} transition={{ duration: 6, repeat: Infinity }} />
+                            <motion.div className="w-96 h-96 bg-red-100 rounded-full opacity-30 absolute -bottom-10 -left-10 floating" animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, delay: 1 }} />
+                            <img src="https://space.coze.cn/api/coze_space/gen_image?image_size=landscape_4_3&prompt=chinese%20ancient%20scroll%20with%20calligraphy%20and%20painting%20art&sign=dc6a09330f9f8db14739b4c78d0105fb" alt="古籍展示" className="w-full h-auto rounded-xl shadow-2xl relative z-10 transform rotate-2 book-shadow" />
                         </div>
                     </div>
+                    </div>
                 </motion.div>
-            </motion.div>
-            {}
-             <footer
-                className="absolute bottom-0 left-0 right-0 p-6 text-center text-sm opacity-70">
-                <p>© 2025 文心新述 - 古典小说智能改编平台 | 以科技传承文化经典</p>
-            </footer>
-            {}
+
+                <footer className="home-foreground absolute bottom-0 left-0 right-0 p-6 text-center text-sm opacity-70">
+                    <p>© 2025 文心新述 - 古典小说智能改编平台 | 以科技传承文化经典</p>
+                </footer>
+            </section>
         </div>
     );
 }

@@ -3,30 +3,82 @@ import * as userService from './user.service.js';
 import { success, error } from '../../lib/response.js';
 import { requireAuth } from '../auth/auth.middleware.js';
 import { isCreationCategory } from '../community/community.types.js';
+import { isValidNickname, normalizeNickname } from '../auth/auth.service.js';
 
 export const userRouter = Router();
 
-// 保存创作
+userRouter.patch('/me/profile', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const nickname = normalizeNickname(typeof req.body?.nickname === 'string' ? req.body.nickname : '');
+    const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+    const avatar = req.body?.avatar;
+    if (!isValidNickname(nickname)) {
+      return res.status(400).json(error('用户名需为 2-20 个字符，且不能包含特殊符号', 400));
+    }
+    if (Array.from(signature).length > 100) {
+      return res.status(400).json(error('签名不能超过 100 个字符', 400));
+    }
+    if (avatar !== undefined && avatar !== null && (
+      typeof avatar !== 'string'
+      || avatar.length > 350_000
+      || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(avatar)
+    )) {
+      return res.status(400).json(error('头像格式或大小不符合要求', 400));
+    }
+    const user = await userService.updateProfile(req.auth!.userId, {
+      nickname,
+      signature,
+      ...(avatar === undefined ? {} : { avatar }),
+    });
+    res.json(success(user, '个人资料已更新'));
+  } catch (err) {
+    console.error('更新个人资料失败:', err);
+    res.status(500).json(error('更新个人资料失败'));
+  }
+});
+
+// 保存草稿或发布创作
 userRouter.post('/creation', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { bookId, category = 'other', prompt, content } = req.body;
+    const { bookId, category = 'other', prompt, content, action = 'draft', draftId } = req.body;
     if (typeof prompt !== 'string' || !prompt.trim() || typeof content !== 'string' || !content.trim()) {
       return res.status(400).json(error('参数不完整'));
     }
     if (!isCreationCategory(category)) {
       return res.status(400).json(error('无效的创作分类', 400));
     }
-    const creation = await userService.saveCreation({
+    if (action !== 'draft' && action !== 'publish') {
+      return res.status(400).json(error('无效的保存方式', 400));
+    }
+    const creation = await userService.persistCreation({
       userId: req.auth!.userId,
       bookId: bookId ? Number(bookId) : undefined,
       category,
       prompt: prompt.trim(),
       content: content.trim(),
+      action,
+      draftId: draftId ? Number(draftId) : undefined,
     });
+    if (!creation) return res.status(404).json(error('草稿不存在或已发布', 404));
     res.json(success(creation));
   } catch (err: any) {
     console.error('保存创作失败:', err);
     res.status(500).json(error('保存创作失败'));
+  }
+});
+
+// 进入创意工坊时恢复该作品、该类型的最新草稿。
+userRouter.get('/me/draft', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const bookId = Number(req.query.bookId);
+    const category = req.query.category;
+    if (!Number.isInteger(bookId) || bookId <= 0 || !isCreationCategory(category)) {
+      return res.status(400).json(error('无效的草稿查询条件', 400));
+    }
+    res.json(success(await userService.getDraft(req.auth!.userId, bookId, category)));
+  } catch (err) {
+    console.error('获取草稿失败:', err);
+    res.status(500).json(error('获取草稿失败'));
   }
 });
 

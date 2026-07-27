@@ -188,6 +188,21 @@ export async function creativeWrite(originalText: string, prompt: string): Promi
   });
 }
 
+/** 从已有生成结果的末尾续写，避免将长文分块后对每块各续写一次。 */
+export async function continueWriting(existingContent: string, requirement?: string): Promise<string> {
+  const context = existingContent.slice(-6000);
+  const instruction = requirement?.trim()
+    ? `续写要求：${requirement.trim()}`
+    : '请根据上文自由续写，自然推进情节。';
+  return callDeepSeekAPI(buildMessages(
+    '你是一位擅长长篇叙事的文学创作助手。请紧接现有内容续写，保持人物、文风、视角和情节连贯，不要重复上文。',
+    `${instruction}\n\n现有内容（仅作上下文）：\n${CONTENT_SEP}${context}`,
+  ), {
+    temperature: 0.8,
+    max_tokens: 2500,
+  });
+}
+
 export async function generateCharacterScript(originalText: string, characterName: string): Promise<string> {
   const system = '你是一位专业的剧本杀编剧，擅长提取人物动机并编写深刻的角色剧本。请提供角色背景、秘密、目标、人际关系及关键行动时间轴。';
   return processLongText(system, `请根据以下内容，为【${characterName}】角色编写剧本杀剧本：\n\n${CONTENT_SEP}${originalText}`, {

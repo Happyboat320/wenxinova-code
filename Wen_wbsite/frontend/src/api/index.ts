@@ -36,6 +36,9 @@ function unwrap<T>(response: ApiResponse<T>, fallback: string): T {
 export interface User {
   id: number;
   phone: string;
+  nickname: string | null;
+  signature: string | null;
+  avatar: string | null;
   status: string;
   phoneVerifiedAt: string | null;
   createdAt: string;
@@ -101,7 +104,10 @@ export interface Creation {
   category: CreationCategory;
   prompt: string;
   content: string;
+  status: 'draft' | 'published';
   createdAt: string;
+  updatedAt: string;
+  publishedAt: string | null;
   book?: { title: string } | null;
 }
 
@@ -120,12 +126,25 @@ export interface CommunityCreation {
   category: CreationCategory;
   prompt: string;
   createdAt: string;
-  user: { phone: string };
+  publishedAt: string | null;
+  likeCount: number;
+  commentCount: number;
+  user: { nickname?: string | null; avatar?: string | null; phone?: string };
   book: { title: string } | null;
+}
+
+export interface CommunityComment {
+  id: number;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  user: { nickname?: string | null; avatar?: string | null };
 }
 
 export interface CreationDetail extends CommunityCreation {
   content: string;
+  likedByCurrentUser: boolean;
+  comments: CommunityComment[];
   book: { title: string; author: string } | null;
 }
 
@@ -173,7 +192,7 @@ export async function getBookTranslation(id: number): Promise<string> {
 
 export async function adaptBook(
   translation: string,
-  type: 'adapt' | 'creative' | 'script' | 'custom',
+  type: 'adapt' | 'creative' | 'script' | 'custom' | 'continue',
   prompt: string
 ): Promise<string> {
   const response = await client.post<ApiResponse<{ adaptedContent: string }>>('/adapt', {
@@ -184,8 +203,13 @@ export async function adaptBook(
   return unwrap(response.data, '生成内容失败').adaptedContent;
 }
 
-async function authenticate(path: '/auth/login' | '/auth/register', phone: string, password: string, code?: string): Promise<AuthSession> {
-  const response = await client.post<ApiResponse<AuthSession>>(path, { phone, password, ...(code ? { code } : {}) });
+async function authenticate(path: '/auth/login' | '/auth/register', phone: string, password: string, code?: string, nickname?: string): Promise<AuthSession> {
+  const response = await client.post<ApiResponse<AuthSession>>(path, {
+    phone,
+    password,
+    ...(code ? { code } : {}),
+    ...(nickname ? { nickname } : {}),
+  });
   const session = unwrap(response.data, '登录失败');
   setAccessToken(session.accessToken);
   return session;
@@ -200,8 +224,8 @@ export async function sendRegistrationCode(phone: string): Promise<{ retryAfter:
   return unwrap(response.data, '验证码发送失败');
 }
 
-export function register(phone: string, password: string, code: string): Promise<AuthSession> {
-  return authenticate('/auth/register', phone, password, code);
+export function register(phone: string, password: string, code: string, nickname: string): Promise<AuthSession> {
+  return authenticate('/auth/register', phone, password, code, nickname);
 }
 
 export async function refreshAuth(): Promise<AuthSession> {
@@ -220,6 +244,11 @@ export async function getCurrentUser(): Promise<User> {
   return unwrap(response.data, '获取用户信息失败');
 }
 
+export async function updateProfile(data: { nickname: string; signature: string; avatar?: string | null }): Promise<User> {
+  const response = await client.patch<ApiResponse<User>>('/users/me/profile', data);
+  return unwrap(response.data, '更新个人资料失败');
+}
+
 export async function logout(): Promise<void> {
   try {
     await refreshClient.post('/auth/logout', {});
@@ -233,9 +262,18 @@ export async function saveCreation(data: {
   category: CreationCategory;
   prompt: string;
   content: string;
+  action: 'draft' | 'publish';
+  draftId?: number;
 }): Promise<Creation> {
   const response = await client.post<ApiResponse<Creation>>('/users/creation', data);
   return unwrap(response.data, '保存创作失败');
+}
+
+export async function getDraft(bookId: number, category: CreationCategory): Promise<Creation | null> {
+  const response = await client.get<ApiResponse<Creation | null>>('/users/me/draft', {
+    params: { bookId, category },
+  });
+  return unwrap(response.data, '获取草稿失败');
 }
 
 export async function getUserCreations(): Promise<Creation[]> {
@@ -259,7 +297,15 @@ export async function getCommunityCreations(page = 1, category?: CreationCategor
   }>>('/community/creations', {
     params: { page, category },
   });
-  return unwrap(response.data, '获取社区列表失败');
+  const data = unwrap(response.data, '获取社区列表失败');
+  return {
+    ...data,
+    list: data.list.map(creation => ({
+      ...creation,
+      likeCount: Number.isFinite(creation.likeCount) ? creation.likeCount : 0,
+      commentCount: Number.isFinite(creation.commentCount) ? creation.commentCount : 0,
+    })),
+  };
 }
 
 export async function getCommunityCategories(): Promise<Array<CategoryOption & { value: CreationCategory }>> {
@@ -269,5 +315,22 @@ export async function getCommunityCategories(): Promise<Array<CategoryOption & {
 
 export async function getCreationDetail(id: number): Promise<CreationDetail> {
   const response = await client.get<ApiResponse<CreationDetail>>(`/community/creations/${id}`);
-  return unwrap(response.data, '获取作品详情失败');
+  const detail = unwrap(response.data, '获取作品详情失败');
+  return {
+    ...detail,
+    likeCount: Number.isFinite(detail.likeCount) ? detail.likeCount : 0,
+    commentCount: Number.isFinite(detail.commentCount) ? detail.commentCount : 0,
+    likedByCurrentUser: detail.likedByCurrentUser === true,
+    comments: Array.isArray(detail.comments) ? detail.comments : [],
+  };
+}
+
+export async function toggleCreationLike(id: number): Promise<{ liked: boolean; likeCount: number }> {
+  const response = await client.post<ApiResponse<{ liked: boolean; likeCount: number }>>(`/community/creations/${id}/like`);
+  return unwrap(response.data, '更新点赞失败');
+}
+
+export async function addCreationComment(id: number, content: string): Promise<CommunityComment> {
+  const response = await client.post<ApiResponse<CommunityComment>>(`/community/creations/${id}/comments`, { content });
+  return unwrap(response.data, '发布评论失败');
 }

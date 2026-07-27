@@ -20,7 +20,6 @@ const DEFAULT_TEXT_DIR = path.join(__dirname, '..', 'texts');
 type Encoding = 'utf-8' | 'utf8' | 'gbk' | 'gb2312';
 
 const FOOTNOTE_REGEX = /\\?\[\d+\]/g;
-const SUMMARY_LABEL = '故事梗概：';
 const ORIGINAL_LABEL = '原文：';
 
 interface AnthologyEntry {
@@ -241,10 +240,10 @@ function parseAnthologyEntries(content: string): AnthologyEntry[] {
 
     const authorMatch = trimmed.match(/作者：([^\n]+)/);
     const titleMatch = trimmed.match(/篇名：([^\n]+)/);
-    const summaryIdx = trimmed.indexOf(SUMMARY_LABEL);
+    const summaryMatch = /(?:故事)?梗概：/.exec(trimmed);
     const originalIdx = trimmed.indexOf(ORIGINAL_LABEL);
 
-    if (!authorMatch || !titleMatch || summaryIdx === -1 || originalIdx === -1) {
+    if (!authorMatch || !titleMatch || !summaryMatch) {
       continue;
     }
 
@@ -254,10 +253,17 @@ function parseAnthologyEntries(content: string): AnthologyEntry[] {
       continue;
     }
 
-    const summaryRaw = trimmed.slice(summaryIdx + SUMMARY_LABEL.length, originalIdx).trim();
+    const summaryStart = summaryMatch.index + summaryMatch[0].length;
+    const implicitOriginalIdx = originalIdx < 0 ? trimmed.indexOf('\n\n', summaryStart) : -1;
+    const summaryEnd = originalIdx >= 0 ? originalIdx : implicitOriginalIdx;
+    if (summaryEnd < 0) {
+      continue;
+    }
+    const summaryRaw = trimmed.slice(summaryStart, summaryEnd).trim();
     const summary = summaryRaw ? cleanMultilineText(summaryRaw) : null;
 
-    const remainder = trimmed.slice(originalIdx + ORIGINAL_LABEL.length);
+    const originalStart = originalIdx >= 0 ? originalIdx + ORIGINAL_LABEL.length : summaryEnd;
+    const remainder = trimmed.slice(originalStart).trimStart();
     const { text: originalSegment, annotations } = splitTextAndAnnotations(remainder);
     const originalText = cleanMultilineText(originalSegment, { removeFootnotes: false });
 

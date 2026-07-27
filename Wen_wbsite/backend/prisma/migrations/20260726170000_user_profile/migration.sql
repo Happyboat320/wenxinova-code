@@ -1,0 +1,3 @@
+ALTER TABLE "User" ADD COLUMN "nickname" TEXT;
+ALTER TABLE "User" ADD COLUMN "signature" TEXT;
+ALTER TABLE "User" ADD COLUMN "avatar" TEXT;

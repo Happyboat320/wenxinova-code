@@ -23,6 +23,9 @@ describe('密码认证与双令牌', () => {
     await prisma.$executeRawUnsafe(`CREATE TABLE "User" (
       "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
       "phone" TEXT NOT NULL,
+      "nickname" TEXT,
+      "signature" TEXT,
+      "avatar" TEXT,
       "passwordHash" TEXT,
       "phoneVerifiedAt" DATETIME,
       "status" TEXT NOT NULL DEFAULT 'active',
@@ -65,18 +68,20 @@ describe('密码认证与双令牌', () => {
     expect(smsMocks.sendVerifyCode).toHaveBeenCalledOnce();
     await request(app).post('/api/auth/register').send({ phone: '123', password: 'password123', code: '123456' }).expect(400);
     await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'short', code: '123456' }).expect(400);
-    await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'password123', code: '123456' }).expect(201);
-    await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'password123', code: '123456' }).expect(409);
+    await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'password123', code: '123456' }).expect(400);
+    await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'password123', code: '123456', nickname: '古典迷' }).expect(201);
+    await request(app).post('/api/auth/register').send({ phone: '13800000000', password: 'password123', code: '123456', nickname: '古典迷' }).expect(409);
   });
 
   it('注册保存密码哈希，密码登录后 Bearer Access Token 可读取本人信息', async () => {
     await request(app)
       .post('/api/auth/register')
-      .send({ phone: '13800000000', password: 'password123', code: '123456' })
+      .send({ phone: '13800000000', password: 'password123', code: '123456', nickname: '红楼读者' })
       .expect(201);
     const stored = await prisma.user.findUniqueOrThrow({ where: { phone: '13800000000' } });
     expect(stored.passwordHash).toBeTruthy();
     expect(stored.passwordHash).not.toBe('password123');
+    expect(stored.nickname).toBe('红楼读者');
 
     const login = await request(app)
       .post('/api/auth/login')
@@ -92,6 +97,13 @@ describe('密码认证与双令牌', () => {
     expect(me.body.data.id).toBe(login.body.data.user.id);
     expect(await prisma.user.count()).toBe(1);
 
+    const profile = await request(app)
+      .patch('/api/users/me/profile')
+      .set('Authorization', `Bearer ${login.body.data.accessToken}`)
+      .send({ nickname: '新昵称', signature: '以文会友', avatar: 'data:image/png;base64,aA==' })
+      .expect(200);
+    expect(profile.body.data).toMatchObject({ nickname: '新昵称', signature: '以文会友', avatar: 'data:image/png;base64,aA==' });
+
     await request(app).post('/api/auth/login').send({ phone: '13800000000', password: 'wrong-password' }).expect(401);
     expect(smsMocks.checkVerifyCode).toHaveBeenCalledTimes(1);
   });
@@ -99,14 +111,14 @@ describe('密码认证与双令牌', () => {
   it('旧短信账号可通过注册验证设置密码且保留原账号', async () => {
     const legacy = await prisma.user.create({ data: { phone: '13700000000', phoneVerifiedAt: new Date() } });
     const result = await request(app).post('/api/auth/register')
-      .send({ phone: legacy.phone, password: 'new-password', code: '123456' }).expect(201);
+      .send({ phone: legacy.phone, password: 'new-password', code: '123456', nickname: '旧账号用户' }).expect(201);
     expect(result.body.data.user.id).toBe(legacy.id);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: legacy.id } })).passwordHash).toBeTruthy();
   });
 
   it('Refresh Token 轮换后旧令牌重放会撤销会话链', async () => {
     const login = await request(app).post('/api/auth/register')
-      .send({ phone: '13900000000', password: 'password123', code: '123456' }).expect(201);
+      .send({ phone: '13900000000', password: 'password123', code: '123456', nickname: '会话测试' }).expect(201);
     const oldCookie = login.headers['set-cookie'][0].split(';')[0];
 
     const refreshed = await request(app).post('/api/auth/refresh').set('Cookie', oldCookie).expect(200);
