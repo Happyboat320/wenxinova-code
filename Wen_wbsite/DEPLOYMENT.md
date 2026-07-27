@@ -6,6 +6,7 @@
 - HTTPS 入口：Nginx 监听 `80/443`，HTTP 自动跳转 HTTPS
 - 后端：Express + TypeScript，仅监听 `127.0.0.1:5000`
 - 数据库：SQLite，文件位于 `backend/prisma/data/app.db`
+- 检索：Manticore Search，仅通过本机 `9308` HTTP 接口访问
 - AI：DeepSeek API，默认模型为 `deepseek-chat`
 - 守护：systemd，退出 SSH 后继续运行，服务器重启后自动启动
 
@@ -47,6 +48,10 @@ AUTH_COOKIE_SECURE="true"
 AUTH_COOKIE_DOMAIN=""
 CORS_ORIGINS="https://8.134.215.157"
 TRUST_PROXY="true"
+MANTICORE_HTTP_URL="http://127.0.0.1:9308"
+MANTICORE_TIMEOUT_MS="5000"
+MANTICORE_LIBRARY_INDEX="wenxin_library"
+MANTICORE_COMMUNITY_INDEX="wenxin_community"
 ```
 
 请同时将 `JWT_SECRET` 改成足够长的随机值。不要把 `.env` 提交到版本库或发送给他人。
@@ -98,6 +103,15 @@ cd /root/wenxin/Wen_wbsite/frontend
 npm run build
 sudo systemctl restart wenxin
 ```
+
+首次部署 Manticore 或批量更新书籍数据后，重建可恢复的派生索引：
+
+```bash
+cd /root/wenxin/Wen_wbsite/backend
+npm run search:reindex
+```
+
+数据边界、数量核对和回滚方式见 `backend/docs/SEARCH_MIGRATION.md`。
 
 修改 `backend/.env` 后只需执行 `sudo systemctl restart wenxin`。
 

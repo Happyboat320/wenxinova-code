@@ -1,15 +1,42 @@
 import prisma from '../../lib/prisma.js';
 import * as deepseek from '../../lib/deepseek.js';
+import { searchLibraryIds } from '../search/search.service.js';
 
 export const UNCATEGORIZED_VALUE = '__uncategorized__';
 
 // 获取书籍列表；分类条件必须同时用于列表和总数，保证分页统计一致。
-export async function getBookList(page: number = 1, category?: string) {
+export async function getBookList(page: number = 1, category?: string, query?: string) {
   const pageSize = 9;
   const skip = (page - 1) * pageSize;
   const where = category === UNCATEGORIZED_VALUE
     ? { category: null }
     : category ? { category } : {};
+
+  if (query) {
+    const searchResult = await searchLibraryIds(query, page, pageSize, category);
+    if (searchResult.ids.length === 0) {
+      return { list: [], totalPages: Math.ceil(searchResult.total / pageSize), currentPage: page, totalCount: searchResult.total };
+    }
+    const matches = await prisma.book.findMany({
+      where: { id: { in: searchResult.ids } },
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        category: true,
+        description: true,
+        summary: true,
+      },
+    });
+    const byId = new Map(matches.map(book => [book.id, book]));
+    return {
+      // Prisma 的 IN 查询不保证顺序，按 Manticore 相关度顺序重新排列。
+      list: searchResult.ids.map(id => byId.get(id)).filter((book): book is NonNullable<typeof book> => Boolean(book)),
+      totalPages: Math.ceil(searchResult.total / pageSize),
+      currentPage: page,
+      totalCount: searchResult.total,
+    };
+  }
 
   const [books, total] = await Promise.all([
     prisma.book.findMany({

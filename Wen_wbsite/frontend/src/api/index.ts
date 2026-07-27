@@ -148,7 +148,7 @@ export interface CreationDetail extends CommunityCreation {
   book: { title: string; author: string } | null;
 }
 
-export async function getBookList(page = 1, category?: string): Promise<{
+export async function getBookList(page = 1, category?: string, query?: string): Promise<{
   list: { id: number; title: string; author: string; category: string | null; description: string | null; summary: string | null }[];
   totalPages: number;
   currentPage: number;
@@ -159,7 +159,7 @@ export async function getBookList(page = 1, category?: string): Promise<{
     totalPages: number;
     currentPage: number;
     totalCount: number;
-  }>>('/books', { params: { page, category } });
+  }>>('/books', { params: { page, category, q: query } });
   return unwrap(response.data, '获取书籍列表失败');
 }
 
@@ -281,7 +281,7 @@ export async function getUserCreations(): Promise<Creation[]> {
   return unwrap(response.data, '获取创作历史失败');
 }
 
-export async function getCommunityCreations(page = 1, category?: CreationCategory): Promise<{
+export async function getCommunityCreations(page = 1, category?: CreationCategory, query?: string): Promise<{
   list: CommunityCreation[];
   currentPage: number;
   totalPages: number;
@@ -295,7 +295,7 @@ export async function getCommunityCreations(page = 1, category?: CreationCategor
     totalCount: number;
     pageSize: number;
   }>>('/community/creations', {
-    params: { page, category },
+    params: { page, category, q: query },
   });
   const data = unwrap(response.data, '获取社区列表失败');
   return {

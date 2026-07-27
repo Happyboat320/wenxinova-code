@@ -1,6 +1,17 @@
 import prisma from '../../lib/prisma.js';
 import type { CreationCategory } from '../community/community.types.js';
 import { toPublicUser } from '../auth/auth.service.js';
+import { ensureSearchIndexes } from '../../lib/manticore.js';
+import { syncCreationSearchDocument, syncUserPublishedCreations } from '../search/search.service.js';
+
+function runSearchSync(task: () => Promise<void>, label: string) {
+  // 单元测试使用模拟数据库，不能把模拟记录写进本机的真实 Manticore 索引。
+  if (process.env.NODE_ENV === 'test') return;
+  // 检索索引是可重建的派生数据；同步异常不能回滚已经成功写入 SQLite 的业务数据。
+  void ensureSearchIndexes()
+    .then(task)
+    .catch(error => console.error(`${label}，可运行 npm run search:reindex 修复：`, error));
+}
 
 // 创建用户
 export async function createUser(phone: string) {
@@ -44,6 +55,7 @@ export async function updateProfile(userId: number, data: {
       ...(data.avatar === undefined ? {} : { avatar: data.avatar }),
     },
   });
+  runSearchSync(() => syncUserPublishedCreations(userId), '昵称已保存，但社区检索索引同步失败');
   return toPublicUser(user);
 }
 
@@ -72,7 +84,7 @@ export async function persistCreation(data: {
   if (data.draftId && !draft) return null;
 
   if (draft) {
-    return prisma.creation.update({
+    const creation = await prisma.creation.update({
       where: { id: draft.id },
       data: {
         prompt: data.prompt,
@@ -82,9 +94,11 @@ export async function persistCreation(data: {
         publishedAt: data.action === 'publish' ? new Date() : null,
       },
     });
+    runSearchSync(() => syncCreationSearchDocument(creation.id), '作品已保存，但社区检索索引同步失败');
+    return creation;
   }
 
-  return prisma.creation.create({
+  const creation = await prisma.creation.create({
     data: {
       userId: data.userId,
       bookId: data.bookId,
@@ -95,6 +109,8 @@ export async function persistCreation(data: {
       publishedAt: data.action === 'publish' ? new Date() : null,
     },
   });
+  runSearchSync(() => syncCreationSearchDocument(creation.id), '作品已保存，但社区检索索引同步失败');
+  return creation;
 }
 
 export async function getDraft(userId: number, bookId: number, category: CreationCategory) {

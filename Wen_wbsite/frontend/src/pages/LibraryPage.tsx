@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from "@/hooks/useTheme";
@@ -20,6 +20,8 @@ const LibraryPage = () => {
   const [books, setBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<api.CategoryOption[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -37,7 +39,7 @@ const LibraryPage = () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await api.getBookList(currentPage, selectedCategory || undefined);
+        const data = await api.getBookList(currentPage, selectedCategory || undefined, searchQuery || undefined);
         setBooks(data.list);
         setTotalPages(data.totalPages);
         setTotalCount(data.totalCount);
@@ -49,10 +51,22 @@ const LibraryPage = () => {
       }
     };
     load();
-  }, [currentPage, selectedCategory]);
+  }, [currentPage, selectedCategory, searchQuery]);
 
   const changeCategory = (category: string) => {
     setSelectedCategory(category);
+    setCurrentPage(1);
+  };
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSearchQuery(searchInput.trim());
+    setCurrentPage(1);
+  };
+
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearchQuery('');
     setCurrentPage(1);
   };
 
@@ -101,31 +115,54 @@ const LibraryPage = () => {
           <p className="mt-2 text-sm opacity-60">共 {totalCount.toLocaleString()} 部作品</p>
         </div>
 
-        {/* 分类来自数据库实际值；类别较多时使用下拉框避免页面被按钮铺满。 */}
-        <div className={`mx-auto mb-9 flex max-w-3xl items-center gap-4 rounded-xl border border-amber-200 p-4 shadow-sm ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
-          <label htmlFor="book-category" className="shrink-0 font-medium text-amber-800">
-            <i className="fa-solid fa-layer-group mr-2" />题材体裁
-          </label>
-          <select
-            id="book-category"
-            value={selectedCategory}
-            onChange={event => changeCategory(event.target.value)}
-            className={`min-w-0 flex-1 rounded-lg border border-amber-200 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDark ? 'bg-gray-700 text-gray-100' : 'bg-amber-50/50'}`}
-          >
-            <option value="">全部类别</option>
-            {categories.map(category => (
-              <option key={category.value} value={category.value}>
-                {category.label}（{category.count.toLocaleString()} 部）
-              </option>
-            ))}
-          </select>
+        <div className={`mx-auto mb-9 max-w-3xl rounded-xl border border-amber-200 p-4 shadow-sm ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+          <form onSubmit={submitSearch} className="flex gap-3" role="search">
+            <label htmlFor="library-search" className="sr-only">检索标题、作者或梗概</label>
+            <div className="relative min-w-0 flex-1">
+              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-amber-700" />
+              <input
+                id="library-search"
+                value={searchInput}
+                onChange={event => setSearchInput(event.target.value)}
+                maxLength={100}
+                placeholder="检索标题、作者或梗概"
+                className={`w-full rounded-lg border border-amber-200 py-2.5 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDark ? 'bg-gray-700 text-gray-100' : 'bg-amber-50/50'}`}
+              />
+            </div>
+            <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">检索</button>
+            {searchQuery && <button type="button" onClick={clearSearch} className="btn-secondary">清空</button>}
+          </form>
+
+          {/* 分类与关键词可组合筛选，分类项仍完全来自业务数据库。 */}
+          <div className="mt-4 flex items-center gap-4">
+            <label htmlFor="book-category" className="shrink-0 font-medium text-amber-800">
+              <i className="fa-solid fa-layer-group mr-2" />题材体裁
+            </label>
+            <select
+              id="book-category"
+              value={selectedCategory}
+              onChange={event => changeCategory(event.target.value)}
+              className={`min-w-0 flex-1 rounded-lg border border-amber-200 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDark ? 'bg-gray-700 text-gray-100' : 'bg-amber-50/50'}`}
+            >
+              <option value="">全部类别</option>
+              {categories.map(category => (
+                <option key={category.value} value={category.value}>
+                  {category.label}（{category.count.toLocaleString()} 部）
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+
+        {searchQuery && !loading && !error && (
+          <p className="mb-6 text-center text-sm opacity-70">“{searchQuery}”找到 {totalCount.toLocaleString()} 部作品</p>
+        )}
 
         {loading && <div className="text-center">加载中...</div>}
         {error && <div className="text-center text-red-500">{error}</div>}
 
         {!loading && !error && books.length === 0 && (
-          <div className="py-16 text-center opacity-70">该分类暂无作品</div>
+          <div className="py-16 text-center opacity-70">{searchQuery ? '没有找到匹配的作品，请尝试其他关键词' : '该分类暂无作品'}</div>
         )}
 
         <motion.div

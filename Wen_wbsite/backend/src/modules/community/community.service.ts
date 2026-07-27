@@ -1,21 +1,13 @@
 import prisma from '../../lib/prisma.js';
 import { CREATION_CATEGORIES, type CreationCategory } from './community.types.js';
+import { searchCommunityIds } from '../search/search.service.js';
 
 const PAGE_SIZE = 20;
 
 // 获取社区创作分页；列表接口不返回正文，避免一次加载大量 Markdown。
-export async function getRecentCreations(page: number = 1, category?: CreationCategory) {
+export async function getRecentCreations(page: number = 1, category?: CreationCategory, query?: string) {
   const where = category ? { category, status: 'published' } : { status: 'published' };
-  const [creations, totalCount] = await Promise.all([
-    prisma.creation.findMany({
-      where,
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      orderBy: [
-        { likes: { _count: 'desc' } },
-        { publishedAt: 'desc' },
-      ],
-      select: {
+  const select = {
         id: true,
         userId: true,
         bookId: true,
@@ -40,10 +32,34 @@ export async function getRecentCreations(page: number = 1, category?: CreationCa
             comments: true,
           },
         },
-      },
-    }),
-    prisma.creation.count({ where }),
-  ]);
+  } as const;
+
+  let creations;
+  let totalCount;
+  if (query) {
+    const searchResult = await searchCommunityIds(query, page, PAGE_SIZE, category);
+    totalCount = searchResult.total;
+    const matches = searchResult.ids.length === 0 ? [] : await prisma.creation.findMany({
+      where: { id: { in: searchResult.ids }, status: 'published' },
+      select,
+    });
+    const byId = new Map(matches.map(creation => [creation.id, creation]));
+    creations = searchResult.ids.map(id => byId.get(id)).filter((creation): creation is NonNullable<typeof creation> => Boolean(creation));
+  } else {
+    [creations, totalCount] = await Promise.all([
+      prisma.creation.findMany({
+        where,
+        skip: (page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+        orderBy: [
+          { likes: { _count: 'desc' } },
+          { publishedAt: 'desc' },
+        ],
+        select,
+      }),
+      prisma.creation.count({ where }),
+    ]);
+  }
 
   return {
     list: creations.map(({ _count, ...creation }) => ({

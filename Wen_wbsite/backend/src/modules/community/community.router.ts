@@ -3,6 +3,8 @@ import * as communityService from './community.service.js';
 import { success, error } from '../../lib/response.js';
 import { isCreationCategory } from './community.types.js';
 import { optionalAuth, requireAuth } from '../auth/auth.middleware.js';
+import { isSearchQueryTooLong, normalizeSearchQuery } from '../search/search.service.js';
+import { SearchUnavailableError } from '../../lib/manticore.js';
 
 export const communityRouter = Router();
 
@@ -14,9 +16,16 @@ communityRouter.get('/creations', async (req: Request, res: Response) => {
     if (category !== undefined && !isCreationCategory(category)) {
       return res.status(400).json(error('无效的社区分类', 400));
     }
-    res.json(success(await communityService.getRecentCreations(page, category)));
+    const query = normalizeSearchQuery(req.query.q);
+    if (isSearchQueryTooLong(query)) {
+      return res.status(400).json(error('检索关键词不能超过 100 个字符', 400));
+    }
+    res.json(success(await communityService.getRecentCreations(page, category, query)));
   } catch (err: any) {
     console.error('获取社区列表失败:', err);
+    if (err instanceof SearchUnavailableError) {
+      return res.status(503).json(error('检索服务暂时不可用，请稍后重试', 503));
+    }
     res.status(500).json(error('获取社区列表失败'));
   }
 });

@@ -12,6 +12,8 @@ const UGCCommunityPage = () => {
   const [creations, setCreations] = useState<api.CommunityCreation[]>([]);
   const [categories, setCategories] = useState<Array<api.CategoryOption & { value: api.CreationCategory }>>([]);
   const [selectedCategory, setSelectedCategory] = useState<api.CreationCategory | ''>('');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -36,7 +38,7 @@ const UGCCommunityPage = () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await api.getCommunityCreations(currentPage, selectedCategory || undefined);
+        const data = await api.getCommunityCreations(currentPage, selectedCategory || undefined, searchQuery || undefined);
         setCreations(data.list);
         setTotalPages(data.totalPages);
         setTotalCount(data.totalCount);
@@ -47,10 +49,22 @@ const UGCCommunityPage = () => {
       }
     };
     loadCreations();
-  }, [currentPage, selectedCategory]);
+  }, [currentPage, selectedCategory, searchQuery]);
 
   const changeCategory = (category: api.CreationCategory | '') => {
     setSelectedCategory(category);
+    setCurrentPage(1);
+  };
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSearchQuery(searchInput.trim());
+    setCurrentPage(1);
+  };
+
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearchQuery('');
     setCurrentPage(1);
   };
 
@@ -155,6 +169,23 @@ const UGCCommunityPage = () => {
           <p className="mt-2 text-sm opacity-60">当前分类共 {totalCount.toLocaleString()} 篇</p>
         </div>
 
+        <form onSubmit={submitSearch} className={`mx-auto mb-6 flex max-w-3xl gap-3 rounded-xl border border-amber-200 p-4 shadow-sm ${isDark ? 'bg-gray-800' : 'bg-white'}`} role="search">
+          <label htmlFor="community-search" className="sr-only">检索用户名、源篇目名或改编全文</label>
+          <div className="relative min-w-0 flex-1">
+            <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-amber-700" />
+            <input
+              id="community-search"
+              value={searchInput}
+              onChange={event => setSearchInput(event.target.value)}
+              maxLength={100}
+              placeholder="检索用户名、源篇目名或改编全文"
+              className={`w-full rounded-lg border border-amber-200 py-2.5 pl-11 pr-4 outline-none focus:ring-2 focus:ring-amber-400 ${isDark ? 'bg-gray-700 text-gray-100' : 'bg-amber-50/50'}`}
+            />
+          </div>
+          <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">检索</button>
+          {searchQuery && <button type="button" onClick={clearSearch} className="btn-secondary">清空</button>}
+        </form>
+
         <div className="mb-9 flex flex-wrap justify-center gap-3" aria-label="社区作品分类">
           <button
             onClick={() => changeCategory('')}
@@ -173,10 +204,16 @@ const UGCCommunityPage = () => {
           ))}
         </div>
 
+        {searchQuery && !loading && !error && (
+          <p className="mb-6 text-center text-sm opacity-70">“{searchQuery}”找到 {totalCount.toLocaleString()} 篇已发布作品</p>
+        )}
+
         {loading && <div className="py-16 text-center">加载中...</div>}
         {error && <div className="py-8 text-center text-red-600">{error}</div>}
         {!loading && !error && creations.length === 0 && (
-          <div className="rounded-xl bg-white p-10 text-center text-gray-800 shadow">当前分类暂时没有作品，完成创作后点击“发布”即可展示。</div>
+          <div className="rounded-xl bg-white p-10 text-center text-gray-800 shadow">
+            {searchQuery ? '没有找到匹配的已发布作品，请尝试其他关键词' : '当前分类暂时没有作品，完成创作后点击“发布”即可展示。'}
+          </div>
         )}
 
         {!loading && !error && (

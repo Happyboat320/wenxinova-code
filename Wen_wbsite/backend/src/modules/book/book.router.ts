@@ -3,6 +3,8 @@ import * as bookService from './book.service.js';
 import { success, error } from '../../lib/response.js';
 import { requireAuth } from '../auth/auth.middleware.js';
 import { aiUsageGuard } from '../auth/rate-limit.js';
+import { isSearchQueryTooLong, normalizeSearchQuery } from '../search/search.service.js';
+import { SearchUnavailableError } from '../../lib/manticore.js';
 
 export const bookRouter = Router();
 
@@ -11,10 +13,17 @@ bookRouter.get('/', async (req: Request, res: Response) => {
   try {
     const page = Math.max(parseInt(req.query.page as string) || 1, 1);
     const category = typeof req.query.category === 'string' ? req.query.category.trim() : undefined;
-    const result = await bookService.getBookList(page, category || undefined);
+    const query = normalizeSearchQuery(req.query.q);
+    if (isSearchQueryTooLong(query)) {
+      return res.status(400).json(error('检索关键词不能超过 100 个字符', 400));
+    }
+    const result = await bookService.getBookList(page, category || undefined, query);
     res.json(success(result));
   } catch (err) {
     console.error('获取书籍列表失败:', err);
+    if (err instanceof SearchUnavailableError) {
+      return res.status(503).json(error('检索服务暂时不可用，请稍后重试', 503));
+    }
     res.status(500).json(error('获取书籍列表失败'));
   }
 });

@@ -5,6 +5,7 @@
 - 前端：React + Vite + TypeScript + Tailwind CSS
 - 后端：Node.js + Express + TypeScript
 - 数据库：Prisma + SQLite / 可配置为其他数据库
+- 全文检索：Manticore Search（中文 n-gram，SQLite 仍为业务真源）
 - AI：通过外部 DeepSeek API 调用 `deepseek-chat` 模型
 - 测试：Vitest
 
@@ -21,6 +22,7 @@
   - `ALIYUN_SMS_SIGN_NAME` / `ALIYUN_SMS_TEMPLATE_CODE`：阿里云短信签名和模板
   - `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`：两段不同的双令牌密钥（至少 32 字符）
   - `AUTH_COOKIE_SECURE`：本地 HTTP 设为 `false`，生产 HTTPS 设为 `true`
+  - `MANTICORE_HTTP_URL`：Manticore HTTP 地址（默认 `http://127.0.0.1:9308`）
 
 - 前端（在 `.env` 或使用 Vite 的 `VITE_` 前缀）：
   - `VITE_API_BASE_URL`：后端 API 地址；生产环境默认使用同源 `/api`

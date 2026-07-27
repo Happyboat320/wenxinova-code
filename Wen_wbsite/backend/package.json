@@ -16,6 +16,7 @@
     "import:text": "tsx scripts/import-text.ts",
     "import:json": "tsx scripts/import-json.ts",
     "import:all": "prisma migrate deploy && tsx scripts/import-all.ts",
+    "search:reindex": "tsx scripts/reindex-search.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
