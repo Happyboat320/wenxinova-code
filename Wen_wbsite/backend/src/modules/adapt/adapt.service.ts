@@ -21,3 +21,7 @@ export async function adaptBook(translation: string, type: string, prompt: strin
       return deepseek.adaptBook(translation, prompt);
   }
 }
+
+export function analyzeCharacters(originalText: string) {
+  return deepseek.analyzeCharactersForCoPlay(originalText);
+}

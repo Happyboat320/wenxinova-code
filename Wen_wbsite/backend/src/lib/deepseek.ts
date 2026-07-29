@@ -22,7 +22,23 @@ interface DeepSeekResponse {
   };
 }
 
+interface DeepSeekCallOptions {
+  temperature?: number;
+  max_tokens?: number;
+  model?: string;
+  signal?: AbortSignal;
+  response_format?: { type: 'json_object' };
+}
+
 function getMockResponse(prompt: string): string {
+  if (prompt.includes('角色分析') && prompt.includes('characters')) {
+    return JSON.stringify({
+      characters: [
+        { name: '模拟角色甲', description: '沉稳果决的关键人物', deeds: '在故事关键处挺身决断，推动矛盾转折。' },
+        { name: '模拟角色乙', description: '心思细密的旁观者', deeds: '多次观察众人言行，暗中保存重要线索。' },
+      ],
+    });
+  }
   if (prompt.includes('数字共演') && prompt.includes('messages')) {
     return JSON.stringify({
       messages: [
@@ -57,12 +73,7 @@ function getMockResponse(prompt: string): string {
 
 async function callDeepSeekAPI(
   messages: AIMessage[],
-  options: {
-    temperature?: number;
-    max_tokens?: number;
-    model?: string;
-    signal?: AbortSignal;
-  } = {}
+  options: DeepSeekCallOptions = {}
 ): Promise<string> {
   const prompt = messages.map(message => message.content).join('\n');
   if (AI_MOCK_MODE) {
@@ -73,19 +84,23 @@ async function callDeepSeekAPI(
     throw new Error('未配置 DEEPSEEK_API_KEY');
   }
 
+  const requestBody: Record<string, unknown> = {
+    model: options.model ?? DEEPSEEK_MODEL,
+    messages,
+    stream: false,
+    temperature: options.temperature ?? 0.7,
+    max_tokens: options.max_tokens ?? 2000,
+  };
+  // DeepSeek JSON Output 需要 response_format 和提示词同时约束，后续仍做结构校验。
+  if (options.response_format) requestBody.response_format = options.response_format;
+
   const response = await fetch(DEEPSEEK_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
     },
-    body: JSON.stringify({
-      model: options.model ?? DEEPSEEK_MODEL,
-      messages,
-      stream: false,
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.max_tokens ?? 2000,
-    }),
+    body: JSON.stringify(requestBody),
     signal: options.signal,
   });
 
@@ -234,6 +249,65 @@ export async function customPrompt(content: string, prompt: string): Promise<str
     temperature: 0.7,
     max_tokens: 2500,
   });
+}
+
+export interface CharacterAnalysisItem {
+  id: number;
+  name: string;
+  description: string | null;
+  deeds: string | null;
+}
+
+function cleanJsonText(raw: string): string {
+  return raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+}
+
+function cleanString(input: unknown, maxChars: number): string {
+  if (typeof input !== 'string') return '';
+  return Array.from(input.trim()).slice(0, maxChars).join('');
+}
+
+export function parseCharacterAnalysis(raw: string): CharacterAnalysisItem[] {
+  const value = JSON.parse(cleanJsonText(raw)) as { characters?: unknown };
+  if (!Array.isArray(value.characters)) throw new Error('角色分析 JSON 缺少 characters 数组');
+  const characters = value.characters.map((item, index) => {
+    const row = item as { name?: unknown; description?: unknown; deeds?: unknown };
+    return {
+      id: -(index + 100),
+      name: cleanString(row.name, 20),
+      description: cleanString(row.description, 30) || null,
+      deeds: cleanString(row.deeds, 100) || null,
+    };
+  }).filter(character => character.name).slice(0, 6);
+  if (characters.length < 1) throw new Error('角色分析结果为空');
+  return characters;
+}
+
+export async function analyzeCharactersForCoPlay(originalText: string): Promise<CharacterAnalysisItem[]> {
+  if (AI_MOCK_MODE) {
+    return parseCharacterAnalysis(getMockResponse('角色分析 characters'));
+  }
+  const prompt = `请进行角色分析，并严格输出一个合法 JSON 对象，不使用 Markdown，不输出解释文字。
+JSON 结构必须为：
+{"characters":[{"name":"角色名","description":"不超过30字的身份、性格及人物关系简介","deeds":"不超过100字的主要事迹"}]}
+
+要求：
+1. 只依据原文，提取最适合剧本杀和数字共演的 3-6 个主要角色。
+2. description 不超过 30 个汉字。
+3. deeds 必须概括该角色在原文中的主要事迹，不超过 100 个汉字。
+4. 每个对象只能包含 name、description、deeds 三个字段。
+
+原文：
+${originalText.slice(0, 30000)}`;
+  const raw = await callDeepSeekAPI([
+    { role: 'system', content: '你是古典文学角色分析专家。必须返回可由 JSON.parse 解析的 JSON 对象，根字段为 characters。' },
+    { role: 'user', content: prompt },
+  ], {
+    temperature: 0.2,
+    max_tokens: 1800,
+    response_format: { type: 'json_object' },
+  });
+  return parseCharacterAnalysis(raw);
 }
 
 export interface KnowledgeGraphData {

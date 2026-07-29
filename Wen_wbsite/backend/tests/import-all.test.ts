@@ -65,10 +65,31 @@ describe('整本作品回目导入', () => {
     expect(chapterNumber('闰二十出 闲话')).toBe(20);
     expect(chapterNumber('桃花扇小引')).toBeNull();
     expect(sortChapterRows([
+      { 题目: '序' },
+      { 题目: '第二回 后篇' },
+      { 题目: '第一回 前篇' },
+    ]).map(row => row.题目)).toEqual(['序', '第一回 前篇', '第二回 后篇']);
+    expect(sortChapterRows([
       { 题目: '第二回 后篇' },
       { 题目: '序' },
       { 题目: '第一回 前篇' },
-    ]).map(row => row.题目)).toEqual(['序', '第一回 前篇', '第二回 后篇']);
+      { 题目: '附录' },
+    ]).map(row => row.题目)).toEqual(['第一回 前篇', '第二回 后篇', '序', '附录']);
+  });
+
+  it('整理案名尾号并保留正文后附录', () => {
+    expect(sortChapterRows([
+      { 题目: '漆屏案 三' },
+      { 题目: '漆屏案 一' },
+      { 题目: '漆屏案 二' },
+      { 题目: '太子棺' },
+    ]).map(row => row.题目)).toEqual(['漆屏案 一', '漆屏案 二', '漆屏案 三', '太子棺']);
+    expect(sortChapterRows([
+      { 题目: '小引' },
+      { 题目: '第二出' },
+      { 题目: '第一出' },
+      { 题目: '砌抹' },
+    ]).map(row => row.题目)).toEqual(['小引', '第一出', '第二出', '砌抹']);
   });
 
   it('读取整本作品并按回目编号排序', () => {

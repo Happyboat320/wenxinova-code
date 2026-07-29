@@ -194,20 +194,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
     }
     try {
       setAnalyzingCharacters(true);
-      const response = await api.adaptBook(
-        originalText,
-        'custom',
-        '提取最适合剧本杀和数字共演的 3-6 个主要角色。严格只输出合法 JSON 数组，不使用 Markdown。数组元素格式为 {"name":"角色名","description":"不超过30字的身份、性格及人物关系简介","deeds":"该角色在原文中的主要事迹，80-180字"}。不要编号，不要输出其他内容。',
-      );
-      const normalized = response.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-      const rows = JSON.parse(normalized) as Array<{ name?: unknown; description?: unknown; deeds?: unknown }>;
-      if (!Array.isArray(rows)) throw new Error('AI 返回的角色结构无效');
-      const parsed = rows.map((row, index) => ({
-        id: -(index + 100),
-        name: typeof row.name === 'string' ? row.name.trim().slice(0, 20) : '',
-        description: typeof row.description === 'string' ? row.description.trim().slice(0, 60) : null,
-        deeds: typeof row.deeds === 'string' ? row.deeds.trim().slice(0, 300) : null,
-      })).filter(character => character.name).slice(0, 6) as Character[];
+      const parsed = await api.analyzeCharacters(originalText);
       if (parsed.length === 0) throw new Error('未能识别角色，请稍后重试');
       setGeneratedCharacters(parsed);
       setSelectedCharacter(parsed[0].name);

@@ -77,17 +77,53 @@ export function chapterNumber(title: string): number | null {
 }
 
 export function sortChapterRows(rows: SourceRow[]): SourceRow[] {
-  return rows
-    .map((row, sourceIndex) => ({ row, sourceIndex, number: chapterNumber(clean(row.题目)) }))
+  const items = rows.map((row, sourceIndex) => {
+    const title = clean(row.题目);
+    const number = chapterNumber(title);
+    const trailingMatch = number === null ? title.match(/^(.*?)[\s　]+([零〇一二两三四五六七八九十百廿卅卌\d]+)$/) : null;
+    const trailingNumber = trailingMatch ? chineseNumber(trailingMatch[2]) : null;
+    return {
+      row,
+      sourceIndex,
+      title,
+      number,
+      trailingGroup: trailingNumber === null ? null : trailingMatch?.[1].trim() || null,
+      trailingNumber,
+    };
+  });
+  const firstNumberedIndex = items.find(item => item.number !== null)?.sourceIndex ?? -1;
+  const firstTrailingGroupIndex = new Map<string, number>();
+  for (const item of items) {
+    if (item.trailingGroup && !firstTrailingGroupIndex.has(item.trailingGroup)) {
+      firstTrailingGroupIndex.set(item.trailingGroup, item.sourceIndex);
+    }
+  }
+  return items
     .sort((left, right) => {
-      // 序、跋、凡例等前置篇章没有编号，保持源文件中的相对顺序并置于正文前。
-      if (left.number === null || right.number === null) {
-        if (left.number === null && right.number === null) return left.sourceIndex - right.sourceIndex;
-        return left.number === null ? -1 : 1;
+      if (firstNumberedIndex >= 0) {
+        const section = (item: typeof left) => item.number === null
+          ? item.sourceIndex < firstNumberedIndex ? 0 : 2
+          : 1;
+        const leftSection = section(left);
+        const rightSection = section(right);
+        if (leftSection !== rightSection) return leftSection - rightSection;
+        if (leftSection !== 1) return left.sourceIndex - right.sourceIndex;
+        if (left.number !== right.number) return (left.number ?? 0) - (right.number ?? 0);
+        const rank = (title: string) => title.startsWith('加') ? -1 : title.startsWith('闰') ? 1 : 0;
+        return rank(left.title) - rank(right.title) || left.sourceIndex - right.sourceIndex;
       }
-      if (left.number !== right.number) return left.number - right.number;
-      const rank = (title: string) => title.startsWith('加') ? -1 : title.startsWith('闰') ? 1 : 0;
-      return rank(clean(left.row.题目)) - rank(clean(right.row.题目)) || left.sourceIndex - right.sourceIndex;
+
+      // 《大唐狄公案》这类标题没有“第几回”，用“案名 一/二/三”的尾号整理同组篇章。
+      const groupOrder = (item: typeof left) => item.trailingGroup
+        ? firstTrailingGroupIndex.get(item.trailingGroup) ?? item.sourceIndex
+        : item.sourceIndex;
+      const leftGroupOrder = groupOrder(left);
+      const rightGroupOrder = groupOrder(right);
+      if (leftGroupOrder !== rightGroupOrder) return leftGroupOrder - rightGroupOrder;
+      if (left.trailingGroup && right.trailingGroup && left.trailingGroup === right.trailingGroup) {
+        return (left.trailingNumber ?? 0) - (right.trailingNumber ?? 0) || left.sourceIndex - right.sourceIndex;
+      }
+      return left.sourceIndex - right.sourceIndex;
     })
     .map(item => item.row);
 }

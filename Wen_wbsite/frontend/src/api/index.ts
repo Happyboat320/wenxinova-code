@@ -157,6 +157,13 @@ export interface BookContent {
   characters: { id: number; name: string; description: string | null }[];
 }
 
+export interface AnalyzedCharacter {
+  id: number;
+  name: string;
+  description: string | null;
+  deeds: string | null;
+}
+
 export interface FavoriteCharacter {
   id: number;
   userId: number;
@@ -291,6 +298,11 @@ export async function adaptBook(
     prompt,
   });
   return unwrap(response.data, '生成内容失败').adaptedContent;
+}
+
+export async function analyzeCharacters(originalText: string): Promise<AnalyzedCharacter[]> {
+  const response = await client.post<ApiResponse<{ characters: AnalyzedCharacter[] }>>('/adapt/characters', { originalText });
+  return unwrap(response.data, '角色分析失败').characters;
 }
 
 async function authenticate(path: '/auth/login' | '/auth/register', phone: string, password: string, code?: string, nickname?: string): Promise<AuthSession> {
