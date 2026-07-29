@@ -38,6 +38,7 @@ export default function DigitalCoPlayPage() {
   const [userMessage, setUserMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
+  const [creationSaving, setCreationSaving] = useState<'draft' | 'publish' | null>(null);
 
   const selectedFavorites = useMemo(() => {
     const byId = new Map(favorites.map(character => [character.id, character]));
@@ -165,6 +166,27 @@ export default function DigitalCoPlayPage() {
     }
   };
 
+  const saveSessionCreation = async (action: 'draft' | 'publish') => {
+    if (!activeSession) return;
+    if (activeSession.messages.length === 0) {
+      toast.error('至少生成一轮发言后才能保存为作品');
+      return;
+    }
+    try {
+      setCreationSaving(action);
+      const creation = await api.saveCoPlayCreation(activeSession.id, action);
+      if (action === 'publish') {
+        toast.success(creation.status === 'published' ? '已发布到社区' : '已提交社区审核');
+      } else {
+        toast.success('已保存到我的创作草稿');
+      }
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : '保存数字共演作品失败');
+    } finally {
+      setCreationSaving(null);
+    }
+  };
+
   return (
     <div className={`min-h-screen min-w-[1440px] p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
       <header className="mb-10 flex items-center justify-between">
@@ -263,8 +285,30 @@ export default function DigitalCoPlayPage() {
                 {sessionLoading ? <p className="text-center text-stone-400">加载中...</p> : activeSession ? (
                   <>
                     <div className="mb-4 border-b border-amber-100 pb-4">
-                      <h3 className="text-2xl font-semibold text-amber-900">{activeSession.title}</h3>
-                      <p className="mt-2 line-clamp-2 text-sm text-stone-500">{activeSession.scene}</p>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-2xl font-semibold text-amber-900">{activeSession.title}</h3>
+                          <p className="mt-2 line-clamp-2 text-sm text-stone-500">{activeSession.scene}</p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void saveSessionCreation('draft')}
+                            disabled={creationSaving !== null || activeSession.messages.length === 0}
+                            className="btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <i className="fa-regular fa-floppy-disk mr-2" />{creationSaving === 'draft' ? '保存中...' : '保存为作品'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void saveSessionCreation('publish')}
+                            disabled={creationSaving !== null || activeSession.messages.length === 0}
+                            className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <i className="fa-solid fa-paper-plane mr-2" />{creationSaving === 'publish' ? '提交中...' : '发布到社区'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                     <div className="max-h-[520px] space-y-4 overflow-y-auto pr-2">
                       {activeSession.messages.length === 0 && <p className="text-stone-400">暂无发言。</p>}

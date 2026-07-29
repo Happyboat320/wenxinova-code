@@ -133,7 +133,7 @@ export interface KnowledgeGraph {
   generatedAt: string;
 }
 
-export type CreationCategory = 'adaptation' | 'script' | 'props' | 'dm' | 'other';
+export type CreationCategory = 'adaptation' | 'script' | 'props' | 'dm' | 'coplay' | 'other';
 
 export interface CategoryOption {
   value: string;
@@ -520,4 +520,9 @@ export async function advanceCoPlayTurn(id: number, userMessage?: string): Promi
 
 export async function deleteCoPlaySession(id: number): Promise<void> {
   await client.delete(`/co-play/sessions/${id}`);
+}
+
+export async function saveCoPlayCreation(id: number, action: 'draft' | 'publish'): Promise<Creation> {
+  const response = await client.post<ApiResponse<Creation>>(`/co-play/sessions/${id}/creation`, { action });
+  return unwrap(response.data, '保存数字共演作品失败');
 }

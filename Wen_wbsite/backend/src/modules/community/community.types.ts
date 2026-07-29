@@ -3,6 +3,7 @@ export const CREATION_CATEGORIES = [
   { value: 'script', label: '剧本杀' },
   { value: 'props', label: '道具' },
   { value: 'dm', label: 'DM 手册' },
+  { value: 'coplay', label: '数字共演' },
   { value: 'other', label: '其他' },
 ] as const;
 

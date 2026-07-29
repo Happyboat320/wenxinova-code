@@ -1,5 +1,7 @@
 import prisma from '../../lib/prisma.js';
 import { generateCoPlayTurn } from '../../lib/deepseek.js';
+import { ensureSearchIndexes } from '../../lib/manticore.js';
+import { syncCreationSearchDocument } from '../search/search.service.js';
 
 export const MAX_COPLAY_CHARACTERS = 10;
 
@@ -10,6 +12,38 @@ function cleanText(value: unknown, max: number): string {
 function normalizeOptional(value: unknown, max: number): string | null {
   const text = cleanText(value, max);
   return text || null;
+}
+
+function runSearchSync(task: () => Promise<void>, label: string) {
+  if (process.env.NODE_ENV === 'test') return;
+  // 社区检索索引是可重建的派生数据，不能影响数字共演作品保存结果。
+  void ensureSearchIndexes()
+    .then(task)
+    .catch(error => console.error(`${label}，可运行 npm run search:reindex 修复：`, error));
+}
+
+function formatCoPlayContent(session: NonNullable<Awaited<ReturnType<typeof getSession>>>): string {
+  const characterLines = session.characters.map(character => [
+    `### ${character.position}. ${character.name}`,
+    character.sourceTitle ? `来源：${character.sourceTitle}` : null,
+    character.description ? `简介：${character.description}` : null,
+    character.deeds ? `主要事迹：${character.deeds}` : null,
+  ].filter(Boolean).join('\n')).join('\n\n');
+
+  const dialogueLines = session.messages.map(message => {
+    const speaker = message.role === 'user' ? '用户引导' : message.characterName || '角色';
+    return `**${speaker}**：${message.content.replace(/\r\n/g, '\n').trim()}`;
+  }).join('\n\n');
+
+  return [
+    `# ${session.title}`,
+    '## 共演场景',
+    session.scene,
+    '## 登场角色',
+    characterLines,
+    '## 共演正文',
+    dialogueLines,
+  ].filter(Boolean).join('\n\n');
 }
 
 export async function listFavoriteCharacters(userId: number) {
@@ -218,4 +252,62 @@ export async function deleteSession(userId: number, id: number): Promise<boolean
   if (!existing) return false;
   await prisma.coPlaySession.delete({ where: { id } });
   return true;
+}
+
+export async function persistSessionCreation(userId: number, sessionId: number, action: 'draft' | 'publish') {
+  if (action !== 'draft' && action !== 'publish') return { kind: 'invalid' as const };
+  const [author, session] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
+    getSession(userId, sessionId),
+  ]);
+  if (!author || !session) return { kind: 'missing' as const };
+  if (session.messages.length === 0) return { kind: 'empty' as const };
+
+  const publishingStatus = author.role === 'admin' ? 'published' : 'pending';
+  const nextStatus = action === 'publish' ? publishingStatus : 'draft';
+  const now = new Date();
+  const content = formatCoPlayContent(session);
+  const prompt = `数字共演：${session.title}`;
+
+  const draft = await prisma.creation.findFirst({
+    where: {
+      userId,
+      coPlaySessionId: sessionId,
+      category: 'coplay',
+      status: { in: ['draft', 'rejected'] },
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  const creation = draft
+    ? await prisma.creation.update({
+        where: { id: draft.id },
+        data: {
+          prompt,
+          content,
+          category: 'coplay',
+          coPlaySessionId: sessionId,
+          status: nextStatus,
+          submittedAt: action === 'publish' ? now : null,
+          publishedAt: action === 'publish' && publishingStatus === 'published' ? now : null,
+          reviewedAt: null,
+          reviewedById: null,
+          reviewNote: null,
+        },
+      })
+    : await prisma.creation.create({
+        data: {
+          userId,
+          category: 'coplay',
+          coPlaySessionId: sessionId,
+          prompt,
+          content,
+          status: nextStatus,
+          submittedAt: action === 'publish' ? now : null,
+          publishedAt: action === 'publish' && publishingStatus === 'published' ? now : null,
+        },
+      });
+
+  runSearchSync(() => syncCreationSearchDocument(creation.id), '数字共演作品已保存，但社区检索索引同步失败');
+  return { kind: 'saved' as const, creation };
 }

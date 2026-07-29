@@ -262,13 +262,81 @@ function cleanJsonText(raw: string): string {
   return raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
 }
 
+function extractJsonObject(raw: string): string {
+  const text = cleanJsonText(raw);
+  if (text.startsWith('{') && text.endsWith('}')) return text;
+
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\' && inString) {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === '{') {
+      if (depth === 0) start = index;
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0 && start >= 0) return text.slice(start, index + 1);
+    }
+  }
+  return text;
+}
+
+function parseJsonObject(raw: string): Record<string, unknown> {
+  const value = JSON.parse(extractJsonObject(raw)) as unknown;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('JSON 根节点必须是对象');
+  }
+  return value as Record<string, unknown>;
+}
+
+async function callStructuredJson<T>(
+  messages: AIMessage[],
+  parser: (raw: string) => T,
+  label: string,
+  options: DeepSeekCallOptions = {},
+): Promise<T> {
+  const raw = await callDeepSeekAPI(messages, { ...options, response_format: { type: 'json_object' } });
+  try {
+    return parser(raw);
+  } catch (firstError) {
+    // 长文本下模型偶尔会混入解释或漏字段；只允许一次修复，修复后仍不合格就暴露真实错误。
+    const repaired = await callDeepSeekAPI([
+      { role: 'system', content: '你是严格的 JSON 修复器。只输出可由 JSON.parse 解析的合法 JSON 对象，不要解释。' },
+      {
+        role: 'user',
+        content: `请修复下面的 ${label} 输出，使其符合原任务要求。解析错误：${firstError instanceof Error ? firstError.message : '未知错误'}\n\n原始输出：\n${raw}`,
+      },
+    ], { ...options, temperature: 0, response_format: { type: 'json_object' } });
+    try {
+      return parser(repaired);
+    } catch (secondError) {
+      throw new Error(`${label} JSON 解析失败：${secondError instanceof Error ? secondError.message : '未知错误'}`);
+    }
+  }
+}
+
 function cleanString(input: unknown, maxChars: number): string {
   if (typeof input !== 'string') return '';
   return Array.from(input.trim()).slice(0, maxChars).join('');
 }
 
 export function parseCharacterAnalysis(raw: string): CharacterAnalysisItem[] {
-  const value = JSON.parse(cleanJsonText(raw)) as { characters?: unknown };
+  const value = parseJsonObject(raw) as { characters?: unknown };
   if (!Array.isArray(value.characters)) throw new Error('角色分析 JSON 缺少 characters 数组');
   const characters = value.characters.map((item, index) => {
     const row = item as { name?: unknown; description?: unknown; deeds?: unknown };
@@ -299,15 +367,13 @@ JSON 结构必须为：
 
 原文：
 ${originalText.slice(0, 30000)}`;
-  const raw = await callDeepSeekAPI([
+  return callStructuredJson([
     { role: 'system', content: '你是古典文学角色分析专家。必须返回可由 JSON.parse 解析的 JSON 对象，根字段为 characters。' },
     { role: 'user', content: prompt },
-  ], {
+  ], parseCharacterAnalysis, '角色分析', {
     temperature: 0.2,
     max_tokens: 1800,
-    response_format: { type: 'json_object' },
   });
-  return parseCharacterAnalysis(raw);
 }
 
 export interface KnowledgeGraphData {
@@ -318,37 +384,48 @@ export interface KnowledgeGraphData {
   };
 }
 
-function parseKnowledgeGraph(raw: string): KnowledgeGraphData {
-  const normalized = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const value = JSON.parse(normalized) as KnowledgeGraphData;
+export function parseKnowledgeGraph(raw: string): KnowledgeGraphData {
+  const value = parseJsonObject(raw) as { timeline?: unknown; relationships?: { nodes?: unknown; edges?: unknown } };
   if (!Array.isArray(value.timeline)
     || !Array.isArray(value.relationships?.nodes)
     || !Array.isArray(value.relationships?.edges)) {
     throw new Error('知识图谱 JSON 结构不完整');
   }
-  const clean = (input: unknown, max: number) => typeof input === 'string' ? input.trim().slice(0, max) : '';
-  const nodes = value.relationships.nodes.slice(0, 30).map((node, index) => ({
-    id: clean(node.id, 50) || `character-${index + 1}`,
-    name: clean(node.name, 30),
-    description: clean(node.description, 200),
-  })).filter(node => node.name);
+  const clean = (input: unknown, max: number) => cleanString(input, max);
+  const nodes = value.relationships.nodes.slice(0, 6).map((item, index) => {
+    const node = item as { id?: unknown; name?: unknown; description?: unknown };
+    return {
+      id: clean(node.id, 50) || `character-${index + 1}`,
+      name: clean(node.name, 30),
+      description: clean(node.description, 200),
+    };
+  }).filter(node => node.name);
   const nodeIds = new Set(nodes.map(node => node.id));
+  const nodeNames = new Set(nodes.map(node => node.name));
   return {
-    timeline: value.timeline.slice(0, 30).map((event, index) => ({
-      id: clean(event.id, 50) || `event-${index + 1}`,
-      time: clean(event.time, 50) || `阶段 ${index + 1}`,
-      title: clean(event.title, 80),
-      description: clean(event.description, 500),
-      characters: Array.isArray(event.characters) ? event.characters.map(name => clean(name, 30)).filter(Boolean).slice(0, 10) : [],
-    })).filter(event => event.title),
+    timeline: value.timeline.slice(0, 30).map((item, index) => {
+      const event = item as { id?: unknown; time?: unknown; title?: unknown; description?: unknown; characters?: unknown };
+      return {
+        id: clean(event.id, 50) || `event-${index + 1}`,
+        time: clean(event.time, 50) || `阶段 ${index + 1}`,
+        title: clean(event.title, 80),
+        description: clean(event.description, 500),
+        characters: Array.isArray(event.characters)
+          ? event.characters.map(name => clean(name, 30)).filter(name => name && nodeNames.has(name)).slice(0, 6)
+          : [],
+      };
+    }).filter(event => event.title),
     relationships: {
       nodes,
-      edges: value.relationships.edges.slice(0, 80).map(edge => ({
-        source: clean(edge.source, 50),
-        target: clean(edge.target, 50),
-        relation: clean(edge.relation, 50),
-        description: clean(edge.description, 200),
-      })).filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target) && edge.source !== edge.target && edge.relation),
+      edges: value.relationships.edges.slice(0, 80).map(item => {
+        const edge = item as { source?: unknown; target?: unknown; relation?: unknown; description?: unknown };
+        return {
+          source: clean(edge.source, 50),
+          target: clean(edge.target, 50),
+          relation: clean(edge.relation, 50),
+          description: clean(edge.description, 200),
+        };
+      }).filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target) && edge.source !== edge.target && edge.relation),
     },
   };
 }
@@ -357,14 +434,13 @@ function parseKnowledgeGraph(raw: string): KnowledgeGraphData {
 export async function generateKnowledgeGraph(title: string, author: string, originalText: string): Promise<KnowledgeGraphData> {
   const prompt = `请分析《${title}》（作者：${author || '佚名'}），生成知识图谱。严格只输出一个合法 JSON 对象，不使用 Markdown 代码块。结构必须为：
 {"timeline":[{"id":"event-1","time":"原文中的时间或叙事阶段","title":"事件标题","description":"事件及因果说明","characters":["人物名"]}],"relationships":{"nodes":[{"id":"character-1","name":"人物名","description":"身份、性格与作用"}],"edges":[{"source":"character-1","target":"character-2","relation":"关系名称","description":"关系依据及变化"}]}}
-要求：时间线按故事顺序列出 5-20 个关键事件；人物节点 2-20 个；边的 source/target 必须使用 nodes 中的 id；只依据原文，不虚构。
+要求：时间线按故事顺序列出 5-20 个关键事件；人物节点只保留最重要的 2-6 个主要人物；边的 source/target 必须使用 nodes 中的 id；只依据原文，不虚构。
 原文：
 ${originalText.slice(0, 30000)}`;
-  const raw = await callDeepSeekAPI([
+  const graph = await callStructuredJson([
     { role: 'system', content: '你是古典文学知识图谱专家，擅长从原文提取事件顺序与人物关系。输出必须是机器可解析的 JSON。' },
     { role: 'user', content: prompt },
-  ], { temperature: 0.2, max_tokens: 4000 });
-  const graph = parseKnowledgeGraph(raw);
+  ], parseKnowledgeGraph, '知识图谱', { temperature: 0.2, max_tokens: 4000 });
   if (!graph.timeline.length || !graph.relationships.nodes.length) throw new Error('知识图谱内容为空');
   return graph;
 }

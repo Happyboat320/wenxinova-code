@@ -159,6 +159,7 @@ model CoPlaySession {
   user       User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   characters CoPlaySessionCharacter[]
   messages   CoPlayMessage[]
+  creations  Creation[]
 
   @@index([userId, updatedAt])
 }
@@ -239,7 +240,8 @@ model Creation {
   id          Int       @id @default(autoincrement())
   userId      Int
   bookId      Int?
-  category    String    @default("other") // 社区分类：adaptation/script/props/dm/other
+  coPlaySessionId Int?
+  category    String    @default("other") // 社区分类：adaptation/script/props/dm/coplay/other
   status      String    @default("draft") // draft/pending/published/rejected
   prompt      String    // 提示词
   content     String    // 生成的内容
@@ -254,6 +256,7 @@ model Creation {
   // 关联
   user User @relation(fields: [userId], references: [id])
   book Book? @relation(fields: [bookId], references: [id])
+  coPlaySession CoPlaySession? @relation(fields: [coPlaySessionId], references: [id], onDelete: SetNull)
   likes CreationLike[]
   comments CreationComment[]
   reviewedBy User? @relation("CreationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
@@ -261,6 +264,7 @@ model Creation {
   @@index([status, category, publishedAt])
   @@index([userId, status, updatedAt])
   @@index([status, submittedAt])
+  @@index([coPlaySessionId, status, updatedAt])
 }
 
 // 社区点赞：每位用户对同一篇已发布作品最多点赞一次。

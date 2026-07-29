@@ -104,6 +104,28 @@ coPlayRouter.post('/sessions/:id/turn', requireAuth, aiUsageGuard, async (req: R
   }
 });
 
+coPlayRouter.post('/sessions/:id/creation', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json(error('无效的会话 ID', 400));
+    const action = req.body?.action === 'publish' ? 'publish' : req.body?.action === 'draft' ? 'draft' : null;
+    if (!action) return res.status(400).json(error('无效的保存动作', 400));
+    const result = await coPlayService.persistSessionCreation(req.auth!.userId, id, action);
+    if (result.kind === 'invalid') return res.status(400).json(error('无效的保存动作', 400));
+    if (result.kind === 'missing') return res.status(404).json(error('会话不存在', 404));
+    if (result.kind === 'empty') return res.status(400).json(error('至少生成一轮发言后才能保存为作品', 400));
+    res.status(action === 'publish' ? 201 : 200).json(success(
+      result.creation,
+      action === 'publish'
+        ? (result.creation.status === 'published' ? '已发布到社区' : '已提交社区审核')
+        : '已保存为作品草稿',
+    ));
+  } catch (caught) {
+    console.error('保存数字共演作品失败:', caught);
+    res.status(500).json(error('保存数字共演作品失败'));
+  }
+});
+
 coPlayRouter.delete('/sessions/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
