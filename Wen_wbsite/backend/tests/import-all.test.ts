@@ -71,7 +71,7 @@ describe('整本作品回目导入', () => {
     ]).map(row => row.题目)).toEqual(['序', '第一回 前篇', '第二回 后篇']);
   });
 
-  it('读取五部作品并按回目编号排序', () => {
+  it('读取整本作品并按回目编号排序', () => {
     const longLife = readCollection({
       file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清',
       category: '明清传奇', unit: '出/篇', expectedCount: 50,
@@ -80,5 +80,11 @@ describe('整本作品回目导入', () => {
     expect(longLife.slice(0, 4).map(chapter => chapter.title)).toEqual([
       '第一出 传概', '第二出 定情', '第三出 贿权', '第四出 春睡',
     ]);
+    const officialdom = readCollection({
+      file: '官场.json', title: '官场现形记', author: '李伯元', dynasty: '晚清',
+      category: '世情小说', unit: '回', expectedCount: 60,
+    });
+    expect(officialdom).toHaveLength(60);
+    expect(officialdom[0].title.startsWith('第一回')).toBe(true);
   });
 });

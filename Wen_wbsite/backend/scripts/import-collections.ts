@@ -1,5 +1,5 @@
 /**
- * 导入按“整部作品—多个回目”组织的五部古典小说/传奇。
+ * 导入按“整部作品—多个回目”组织的古典小说/传奇。
  *
  * 与普通 JSON 数据一条记录对应一部作品不同，本目录中每个 JSON 文件才是
  * 一部作品，数组元素是回目。导入会保留作品 Book.id，并整体刷新其回目。
@@ -36,10 +36,13 @@ interface CollectionDefinition {
 const COLLECTIONS: CollectionDefinition[] = [
   // 归入书库已有“传奇”分类，避免与同义的“明清传奇”拆成两个筛选项。
   { file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 50 },
-  { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 48 },
-  { file: '金瓶梅.json', title: '金瓶梅', author: '兰陵笑笑生（疑）', dynasty: '明代', category: '世情小说', unit: '回', expectedCount: 69 },
-  { file: '官场.json', title: '官场现形记', author: '李伯元', dynasty: '晚清', category: '世情小说', unit: '回', expectedCount: 20 },
+  { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 53 },
+  { file: '金瓶梅.json', title: '金瓶梅', author: '兰陵笑笑生（疑）', dynasty: '明代', category: '世情小说', unit: '回', expectedCount: 100 },
+  { file: '官场.json', title: '官场现形记', author: '李伯元', dynasty: '晚清', category: '世情小说', unit: '回', expectedCount: 60 },
   { file: '玉娇梨.json', title: '玉娇梨', author: '荑秋散人（一说天花藏主人）', dynasty: '明末清初', category: '世情小说', unit: '回', expectedCount: 20 },
+  { file: '隋唐演义.json', title: '隋唐演义', author: '褚人获', dynasty: '清', category: '历史演义', unit: '回', expectedCount: 100 },
+  { file: '大唐狄公案.json', title: '大唐狄公案', author: '高罗佩', dynasty: '现代', category: '公案小说', unit: '出/篇', expectedCount: 88 },
+  { file: '大宋中兴通俗演义.json', title: '大宋中兴通俗演义', author: '熊大木', dynasty: '明', category: '历史演义', unit: '回', expectedCount: 74 },
 ];
 
 function clean(value: unknown): string {

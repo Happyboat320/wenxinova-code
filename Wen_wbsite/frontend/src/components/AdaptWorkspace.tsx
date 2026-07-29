@@ -8,14 +8,18 @@ interface Character {
   id: number;
   name: string;
   description: string | null;
+  deeds?: string | null;
 }
 
 interface Props {
   bookId: number;
+  chapterId?: number | null;
   title: string;
   author: string;
   originalText: string;
   characters: Character[];
+  sourceTitle?: string;
+  sourceChapterTitle?: string | null;
   initialMode?: WorkspaceMode;
   initialScriptSection?: ScriptSection;
 }
@@ -52,7 +56,7 @@ const scriptSectionCopy: Record<Exclude<ScriptSection, 'role'>, { title: string;
   },
 };
 
-export default function AdaptWorkspace({ bookId, title, author, originalText, characters, initialMode = 'style', initialScriptSection = 'role' }: Props) {
+export default function AdaptWorkspace({ bookId, chapterId, title, author, originalText, characters, sourceTitle, sourceChapterTitle, initialMode = 'style', initialScriptSection = 'role' }: Props) {
   const { user, openLogin } = useContext(AuthContext);
   const [mode, setMode] = useState<WorkspaceMode>(initialMode);
   const [style, setStyle] = useState(styles[0]);
@@ -72,6 +76,8 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
   const [hydratedCacheKey, setHydratedCacheKey] = useState('');
   const [draftId, setDraftId] = useState<number | undefined>();
   const [persistedVersion, setPersistedVersion] = useState<{ status: api.Creation['status']; content: string } | null>(null);
+  const [favoriteCharacters, setFavoriteCharacters] = useState<api.FavoriteCharacter[]>([]);
+  const [favoriteSaving, setFavoriteSaving] = useState<number | null>(null);
 
   const roleOptions = generatedCharacters.length > 0 ? generatedCharacters : characters;
 
@@ -80,6 +86,16 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
       setSelectedCharacter(roleOptions[0].name);
     }
   }, [roleOptions, selectedCharacter]);
+
+  useEffect(() => {
+    if (!user) {
+      setFavoriteCharacters([]);
+      return;
+    }
+    api.getFavoriteCharacters()
+      .then(setFavoriteCharacters)
+      .catch(caught => toast.error(caught instanceof Error ? caught.message : '收藏角色加载失败'));
+  }, [user]);
 
   const request = useMemo(() => {
     if (mode === 'style') {
@@ -181,13 +197,17 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
       const response = await api.adaptBook(
         originalText,
         'custom',
-        '提取最适合剧本杀的 3-6 个主要角色。每行严格使用“角色名|不超过30字的身份、性格及人物关系简介”格式，不要编号，不要输出其他内容。',
+        '提取最适合剧本杀和数字共演的 3-6 个主要角色。严格只输出合法 JSON 数组，不使用 Markdown。数组元素格式为 {"name":"角色名","description":"不超过30字的身份、性格及人物关系简介","deeds":"该角色在原文中的主要事迹，80-180字"}。不要编号，不要输出其他内容。',
       );
-      const parsed = response.split('\n').map((line, index) => {
-        const normalized = line.replace(/^[-*\d.、\s]+/, '').trim();
-        const [name, ...description] = normalized.split(/[|｜]/);
-        return { id: -(index + 100), name: name?.trim(), description: description.join('|').trim() || null };
-      }).filter(character => character.name && character.name.length <= 20).slice(0, 6) as Character[];
+      const normalized = response.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+      const rows = JSON.parse(normalized) as Array<{ name?: unknown; description?: unknown; deeds?: unknown }>;
+      if (!Array.isArray(rows)) throw new Error('AI 返回的角色结构无效');
+      const parsed = rows.map((row, index) => ({
+        id: -(index + 100),
+        name: typeof row.name === 'string' ? row.name.trim().slice(0, 20) : '',
+        description: typeof row.description === 'string' ? row.description.trim().slice(0, 60) : null,
+        deeds: typeof row.deeds === 'string' ? row.deeds.trim().slice(0, 300) : null,
+      })).filter(character => character.name).slice(0, 6) as Character[];
       if (parsed.length === 0) throw new Error('未能识别角色，请稍后重试');
       setGeneratedCharacters(parsed);
       setSelectedCharacter(parsed[0].name);
@@ -196,6 +216,41 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
       toast.error(caught instanceof Error ? caught.message : '角色分析失败');
     } finally {
       setAnalyzingCharacters(false);
+    }
+  };
+
+  const isFavorite = (character: Character) => favoriteCharacters.some(favorite => (
+    favorite.bookId === bookId
+    && favorite.chapterId === (chapterId || null)
+    && favorite.name === character.name
+    && favorite.sourceType === (character.id > 0 ? 'database' : 'ai')
+  ));
+
+  const favoriteCharacter = async (character: Character) => {
+    if (!user) {
+      toast.error('请先登录后收藏角色');
+      openLogin();
+      return;
+    }
+    try {
+      setFavoriteSaving(character.id);
+      const favorite = await api.addFavoriteCharacter({
+        bookId,
+        chapterId: chapterId || undefined,
+        characterId: character.id > 0 ? character.id : undefined,
+        name: character.name,
+        description: character.description,
+        deeds: character.deeds || null,
+        sourceType: character.id > 0 ? 'database' : 'ai',
+        sourceTitle: sourceTitle || title,
+        sourceChapterTitle,
+      });
+      setFavoriteCharacters(current => current.some(item => item.id === favorite.id) ? current : [favorite, ...current]);
+      toast.success('已加入数字共演收藏夹');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : '收藏角色失败');
+    } finally {
+      setFavoriteSaving(null);
     }
   };
 
@@ -334,10 +389,21 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, ch
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {(roleOptions.length ? roleOptions : [{ id: -1, name: '主角', description: '点击“AI 分析角色”生成作品专属角色方案' }]).map(character => (
-                  <button key={character.id} onClick={() => { setSelectedCharacter(character.name); setResult(''); }} className={`rounded-lg border bg-white p-5 text-left shadow transition hover:-translate-y-0.5 ${selectedCharacter === character.name ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'}`}>
-                    <strong className="block text-center text-lg font-medium">{character.name}</strong>
-                    <span className="mt-2 block text-center text-sm text-gray-500">{character.description || '从原文人物关系中提取角色动机与秘密'}</span>
-                  </button>
+                  <div key={character.id} className={`rounded-lg border bg-white p-5 text-left shadow transition hover:-translate-y-0.5 ${selectedCharacter === character.name ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'}`}>
+                    <button type="button" onClick={() => { setSelectedCharacter(character.name); setResult(''); }} className="block w-full text-left">
+                      <strong className="block text-center text-lg font-medium">{character.name}</strong>
+                      <span className="mt-2 block text-center text-sm text-gray-500">{character.description || '从原文人物关系中提取角色动机与秘密'}</span>
+                    </button>
+                    {character.id !== -1 && (
+                      <button
+                        type="button"
+                        onClick={() => void favoriteCharacter(character)}
+                        disabled={favoriteSaving === character.id || isFavorite(character)}
+                        className="mt-4 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm text-amber-800 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50">
+                        <i className={`fa-${isFavorite(character) ? 'solid' : 'regular'} fa-star mr-2`} />{isFavorite(character) ? '已收藏' : favoriteSaving === character.id ? '收藏中...' : '加入数字共演'}
+                      </button>
+                    )}
+                  </div>
                 ))}
                 </div>
               </div>

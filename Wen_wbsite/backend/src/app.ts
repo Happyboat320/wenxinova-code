@@ -8,6 +8,7 @@ import { userRouter } from './modules/user/user.router.js';
 import { communityRouter } from './modules/community/community.router.js';
 import { authRouter } from './modules/auth/auth.router.js';
 import { adminRouter } from './modules/admin/admin.router.js';
+import { coPlayRouter } from './modules/co-play/co-play.router.js';
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/community', communityRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/co-play', coPlayRouter);
 
 // API 404 处理
 app.use('/api', (req, res) => {

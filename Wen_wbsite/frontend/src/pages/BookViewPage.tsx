@@ -147,6 +147,7 @@ export default function BookViewPage() {
           <button onClick={() => navigate('/classical-library')} className="text-stone-500 transition hover:text-amber-800">← 返回文库</button>
           <Link to="/" className="transition hover:text-amber-800">首页</Link>
           <Link to="/classical-library" className="border-b-2 border-amber-700 pb-1 text-amber-800">古典文库</Link>
+          <Link to="/digital-coplay" className="transition hover:text-amber-800">数字共演</Link>
           <Link to="/ugc-community" className="transition hover:text-amber-800">UGC社区</Link>
           <Link to="/my-collection" className="transition hover:text-amber-800">我的创作</Link>
         </nav>
@@ -260,7 +261,10 @@ export default function BookViewPage() {
           <KnowledgeGraphView bookId={bookId} />
         ) : (
           <AdaptWorkspace key={bookData.chapter?.id || 'single'} bookId={bookId}
+            chapterId={bookData.chapter?.id || null}
             title={bookData.chapter ? `${bookData.title} · ${bookData.chapter.title}` : bookData.title} author={bookData.author}
+            sourceTitle={bookData.title}
+            sourceChapterTitle={bookData.chapter?.title || null}
             originalText={bookData.content} characters={bookData.characters}
             initialMode={new URLSearchParams(location.search).get('mode') === 'script' ? 'script' : 'style'}
             initialScriptSection={initialScriptSection} />

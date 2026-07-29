@@ -34,6 +34,7 @@ model Book {
   annotations Annotation[]
   chapters    BookChapter[]
   creations   Creation[]
+  favoriteCharacters FavoriteCharacter[]
   knowledgeGraph BookKnowledgeGraph?
 }
 
@@ -51,6 +52,7 @@ model BookChapter {
   updatedAt      DateTime @updatedAt
 
   book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  favoriteCharacters FavoriteCharacter[]
 
   @@unique([bookId, order])
   @@index([bookId, title])
@@ -79,6 +81,7 @@ model Character {
 
   // 关联
   book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  favoriteCharacters FavoriteCharacter[]
 }
 
 model Annotation {
@@ -112,8 +115,85 @@ model User {
   reviewedAdminApplications AdminApplication[] @relation("AdminApplicationReviewer")
   reviewedCreations Creation[] @relation("CreationReviewer")
   refreshSessions RefreshSession[]
+  favoriteCharacters FavoriteCharacter[]
+  coPlaySessions CoPlaySession[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+// 用户收藏的数字共演角色快照；AI 分析角色没有 Character.id，也能独立收藏。
+model FavoriteCharacter {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  bookId      Int?
+  chapterId   Int?
+  characterId Int?
+  name        String
+  description String?
+  deeds       String?
+  sourceType  String   @default("ai") // ai/database/manual
+  sourceTitle String?
+  sourceChapterTitle String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book      Book?        @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  chapter   BookChapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  character Character?   @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  coPlaySessionCharacters CoPlaySessionCharacter[]
+
+  @@index([userId, createdAt])
+  @@index([bookId, name])
+}
+
+// 数字共演会话，保存场景和角色顺序，便于继续对话。
+model CoPlaySession {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  scene     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characters CoPlaySessionCharacter[]
+  messages   CoPlayMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model CoPlaySessionCharacter {
+  id                  Int      @id @default(autoincrement())
+  sessionId           Int
+  favoriteCharacterId Int?
+  position            Int
+  name                String
+  description         String?
+  deeds               String?
+  sourceTitle         String?
+  createdAt           DateTime @default(now())
+
+  session           CoPlaySession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  favoriteCharacter FavoriteCharacter? @relation(fields: [favoriteCharacterId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, position])
+  @@index([sessionId])
+}
+
+model CoPlayMessage {
+  id            Int      @id @default(autoincrement())
+  sessionId     Int
+  role          String   // user/character/system
+  characterName String?
+  content       String
+  order         Int
+  createdAt     DateTime @default(now())
+
+  session CoPlaySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, order])
+  @@index([sessionId, order])
 }
 
 // 普通用户申请管理员；审核备注同时记录通过或驳回理由。

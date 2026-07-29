@@ -108,6 +108,7 @@ const LibraryPage = () => {
         <nav className="flex gap-6">
           <Link to="/" className="hover:text-amber-700 transition-colors">首页</Link>
           <Link to="/classical-library" className="font-medium text-amber-800 border-b-2 border-amber-800 pb-1">古典文库</Link>
+          <Link to="/digital-coplay" className="hover:text-amber-700 transition-colors">数字共演</Link>
           <Link to="/ugc-community" className="hover:text-amber-700 transition-colors">UGC社区</Link>
           <Link to="/my-collection" className="hover:text-amber-700 transition-colors">我的创作</Link>
         </nav>

@@ -54,6 +54,7 @@ const MyCollectionPage = () => {
         <nav className="flex gap-6">
           <Link to="/" className="hover:text-amber-700">首页</Link>
           <Link to="/classical-library" className="hover:text-amber-700">古典文库</Link>
+          <Link to="/digital-coplay" className="hover:text-amber-700">数字共演</Link>
           <Link to="/ugc-community" className="hover:text-amber-700">UGC社区</Link>
           <Link to="/my-collection" className="font-medium text-amber-800 border-b-2 border-amber-800 pb-1">我的创作</Link>
         </nav>

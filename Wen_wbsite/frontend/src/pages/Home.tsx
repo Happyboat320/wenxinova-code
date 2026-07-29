@@ -96,6 +96,7 @@ export default function Home() {
 
     const cards = [
         { path: "/classical-library", accent: "bg-amber-100", icon: "fa-scroll text-amber-800", title: "古典文库", description: "浏览四大名著及经典古籍，感受中华文化的博大精深", action: "开始探索" },
+        { path: "/digital-coplay", accent: "bg-green-100", icon: "fa-comments text-green-800", title: "数字共演", description: "从收藏夹选择多个角色，编排顺序并设定场景，让他们轮流对话", action: "开始共演" },
         { path: "/ugc-community", accent: "bg-red-100", icon: "fa-users text-red-800", title: "UGC社区", description: "分享您的创意改编，发现他人的精彩作品，共同创作经典新篇", action: "加入社区" },
         { path: "/my-collection", accent: "bg-blue-100", icon: "fa-bookmark text-blue-800", title: "我的创作", description: "管理您的改编作品，查看收藏的经典片段，继续未完成的创作", action: "我的作品" }
     ];
@@ -171,10 +172,10 @@ export default function Home() {
                 >
                     <motion.div className="home-section-heading" variants={itemVariants}>
                         <p>CORE FUNCTIONS</p>
-                        <h2 className="title-serif">三大核心功能</h2>
+                        <h2 className="title-serif">四大核心功能</h2>
                         <span>从典籍阅读，到灵感创作，再到作品沉淀</span>
                     </motion.div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     {cards.map((card) => <motion.div
                         key={card.path}
                         className="book-card home-function-card relative overflow-hidden group"

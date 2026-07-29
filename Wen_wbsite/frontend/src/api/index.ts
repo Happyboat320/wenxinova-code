@@ -157,6 +157,55 @@ export interface BookContent {
   characters: { id: number; name: string; description: string | null }[];
 }
 
+export interface FavoriteCharacter {
+  id: number;
+  userId: number;
+  bookId: number | null;
+  chapterId: number | null;
+  characterId: number | null;
+  name: string;
+  description: string | null;
+  deeds: string | null;
+  sourceType: string;
+  sourceTitle: string | null;
+  sourceChapterTitle: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CoPlaySessionCharacter {
+  id: number;
+  sessionId: number;
+  favoriteCharacterId: number | null;
+  position: number;
+  name: string;
+  description: string | null;
+  deeds: string | null;
+  sourceTitle: string | null;
+  createdAt: string;
+}
+
+export interface CoPlayMessage {
+  id: number;
+  sessionId: number;
+  role: 'user' | 'character' | 'system';
+  characterName: string | null;
+  content: string;
+  order: number;
+  createdAt: string;
+}
+
+export interface CoPlaySession {
+  id: number;
+  userId: number;
+  title: string;
+  scene: string;
+  createdAt: string;
+  updatedAt: string;
+  characters: CoPlaySessionCharacter[];
+  messages: CoPlayMessage[];
+}
+
 export interface CommunityCreation {
   id: number;
   userId: number;
@@ -407,4 +456,56 @@ export async function toggleCreationLike(id: number): Promise<{ liked: boolean; 
 export async function addCreationComment(id: number, content: string): Promise<CommunityComment> {
   const response = await client.post<ApiResponse<CommunityComment>>(`/community/creations/${id}/comments`, { content });
   return unwrap(response.data, '发布评论失败');
+}
+
+export async function getFavoriteCharacters(): Promise<FavoriteCharacter[]> {
+  const response = await client.get<ApiResponse<FavoriteCharacter[]>>('/co-play/favorites');
+  return unwrap(response.data, '获取收藏角色失败');
+}
+
+export async function addFavoriteCharacter(data: {
+  bookId?: number;
+  chapterId?: number;
+  characterId?: number;
+  name: string;
+  description?: string | null;
+  deeds?: string | null;
+  sourceType?: 'ai' | 'database' | 'manual';
+  sourceTitle?: string;
+  sourceChapterTitle?: string | null;
+}): Promise<FavoriteCharacter> {
+  const response = await client.post<ApiResponse<FavoriteCharacter>>('/co-play/favorites', data);
+  return unwrap(response.data, '收藏角色失败');
+}
+
+export async function removeFavoriteCharacter(id: number): Promise<void> {
+  await client.delete(`/co-play/favorites/${id}`);
+}
+
+export async function getCoPlaySessions(): Promise<CoPlaySession[]> {
+  const response = await client.get<ApiResponse<CoPlaySession[]>>('/co-play/sessions');
+  return unwrap(response.data, '获取数字共演会话失败');
+}
+
+export async function createCoPlaySession(data: {
+  title?: string;
+  scene: string;
+  favoriteCharacterIds: number[];
+}): Promise<CoPlaySession> {
+  const response = await client.post<ApiResponse<CoPlaySession>>('/co-play/sessions', data);
+  return unwrap(response.data, '创建数字共演会话失败');
+}
+
+export async function getCoPlaySession(id: number): Promise<CoPlaySession> {
+  const response = await client.get<ApiResponse<CoPlaySession>>(`/co-play/sessions/${id}`);
+  return unwrap(response.data, '获取数字共演会话失败');
+}
+
+export async function advanceCoPlayTurn(id: number, userMessage?: string): Promise<CoPlayMessage[]> {
+  const response = await client.post<ApiResponse<CoPlayMessage[]>>(`/co-play/sessions/${id}/turn`, { userMessage });
+  return unwrap(response.data, '生成数字共演发言失败');
+}
+
+export async function deleteCoPlaySession(id: number): Promise<void> {
+  await client.delete(`/co-play/sessions/${id}`);
 }

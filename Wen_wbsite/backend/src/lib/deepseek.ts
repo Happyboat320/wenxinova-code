@@ -23,6 +23,14 @@ interface DeepSeekResponse {
 }
 
 function getMockResponse(prompt: string): string {
+  if (prompt.includes('数字共演') && prompt.includes('messages')) {
+    return JSON.stringify({
+      messages: [
+        { characterName: '模拟角色甲', content: '此地风声不定，我愿先听诸位如何判断。' },
+        { characterName: '模拟角色乙', content: '既入此局，便当各陈本心，不可只作旁观。' },
+      ],
+    });
+  }
   if (prompt.includes('timeline') && prompt.includes('relationships')) {
     return JSON.stringify({
       timeline: [{ id: 'event-1', time: '故事开端', title: '人物登场', description: '主要人物相遇，故事由此展开。', characters: ['主角'] }],
@@ -305,4 +313,76 @@ export async function chat(
     max_tokens: 2000,
     signal,
   });
+}
+
+export interface CoPlayCharacterPrompt {
+  name: string;
+  description?: string | null;
+  deeds?: string | null;
+  sourceTitle?: string | null;
+}
+
+export interface CoPlayHistoryMessage {
+  role: string;
+  characterName?: string | null;
+  content: string;
+}
+
+export interface CoPlayTurnMessage {
+  characterName: string;
+  content: string;
+}
+
+function parseCoPlayMessages(raw: string, expectedNames: string[]): CoPlayTurnMessage[] {
+  const normalized = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  const value = JSON.parse(normalized) as { messages?: Array<{ characterName?: unknown; content?: unknown }> };
+  if (!Array.isArray(value.messages)) throw new Error('数字共演返回缺少 messages');
+  const expected = new Set(expectedNames);
+  const used = new Set<string>();
+  const messages = value.messages.map(item => ({
+    characterName: typeof item.characterName === 'string' ? item.characterName.trim().slice(0, 40) : '',
+    content: typeof item.content === 'string' ? item.content.trim().slice(0, 1200) : '',
+  })).filter(item => item.characterName && item.content);
+  for (const message of messages) {
+    if (!expected.has(message.characterName)) throw new Error(`数字共演返回了未选择角色：${message.characterName}`);
+    if (used.has(message.characterName)) throw new Error(`数字共演返回了重复角色：${message.characterName}`);
+    used.add(message.characterName);
+  }
+  if (messages.length !== expectedNames.length) throw new Error('数字共演返回角色数量不完整');
+  return messages;
+}
+
+export async function generateCoPlayTurn(
+  scene: string,
+  characters: CoPlayCharacterPrompt[],
+  history: CoPlayHistoryMessage[],
+): Promise<CoPlayTurnMessage[]> {
+  if (AI_MOCK_MODE) {
+    return characters.map(character => ({
+      characterName: character.name,
+      content: `我乃${character.name}。此刻置身“${scene.slice(0, 40)}”，愿据自身经历与诸位一议。`,
+    }));
+  }
+  const expectedNames = characters.map(character => character.name);
+  const prompt = `数字共演场景：
+${scene}
+
+角色发言顺序和人设：
+${characters.map((character, index) => `${index + 1}. ${character.name}
+来源：${character.sourceTitle || '未知作品'}
+人设简介：${character.description || '无'}
+主要事迹：${character.deeds || '无'}`).join('\n\n')}
+
+近期对话：
+${history.length ? history.map(message => `${message.role === 'user' ? '用户' : message.characterName || '角色'}：${message.content}`).join('\n') : '尚未开始'}
+
+请严格按照上述角色顺序，让每个角色各发言一次。每句发言需符合该角色的人设、主要事迹、所属作品语气与当前场景；角色之间要回应已有上下文，不要替用户发言。
+只输出合法 JSON，不使用 Markdown。格式：
+{"messages":[{"characterName":"${expectedNames[0] || '角色名'}","content":"角色发言"}]}`;
+
+  const raw = await callDeepSeekAPI([
+    { role: 'system', content: '你是古典文学数字共演导演，擅长让不同作品人物在统一场景中保持人设、语气和事迹一致。输出必须是机器可解析 JSON。' },
+    { role: 'user', content: prompt },
+  ], { temperature: 0.75, max_tokens: Math.min(4000, 800 + characters.length * 320) });
+  return parseCoPlayMessages(raw, expectedNames);
 }

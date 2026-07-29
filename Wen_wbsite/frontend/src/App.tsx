@@ -13,6 +13,7 @@ import * as api from '@/api';
 import AuthModal from '@/components/AuthModal';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminPage from '@/pages/AdminPage';
+import DigitalCoPlayPage from '@/pages/DigitalCoPlayPage';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -54,6 +55,7 @@ function App() {
         <Route path="/classical-library/:id/script" element={<AdaptPage />} />
         <Route path="/classical-library/:id/ai-adapt" element={<AdaptPage />} />
         <Route path="/ugc-community" element={<UGCCommunityPage />} />
+        <Route path="/digital-coplay" element={<DigitalCoPlayPage />} />
         <Route path="/my-collection" element={<MyCollectionPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/admin" element={<AdminPage />} />
