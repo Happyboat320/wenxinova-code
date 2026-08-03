@@ -19,7 +19,7 @@ describe('一键导入数据源', () => {
     expect(jsonRows).toHaveLength(24_987);
     expect(excelRows).toHaveLength(39);
     expect(textRows).toHaveLength(39);
-    expect(documentRows).toHaveLength(523);
+    expect(documentRows).toHaveLength(962);
     expect(textRows.map((row) => row.title)).toEqual(excelRows.map((row) => row.title));
 
     const jsonTitles = new Set(jsonRows.map((row) => row.title));
@@ -38,7 +38,7 @@ describe('一键导入数据源', () => {
       occupiedTitles.add(title);
       return true;
     });
-    expect(importableDocuments).toHaveLength(340);
+    expect(importableDocuments).toHaveLength(779);
   });
 
   it('解析多行注释并忽略重复编号', () => {

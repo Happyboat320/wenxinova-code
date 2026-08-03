@@ -4,7 +4,7 @@
  * 数据源：
  * 1. data/ancient_prose.json（通用古文库）
  * 2. 小说目录信息.xlsx + texts/唐宋传奇选.txt（精选小说元数据、原文和注释）
- * 3. data/doc/*.json（解压后的补充文集）
+ * 3. data/doc 目录及子目录中的 JSON（解压并按书名分组的补充文集）
  *
  * 保留 User、Creation 以及 Creation.bookId；精选与 JSON 同名时忽略精选版本。
  * 已有 JSON 数据按原始导入顺序原位更新，以保持 Book.id 稳定。
@@ -22,6 +22,7 @@ const JSON_PATH = path.join(BACKEND_DIR, 'data', 'ancient_prose.json');
 const EXCEL_PATH = path.join(BACKEND_DIR, '小说目录信息.xlsx');
 const TEXT_PATH = path.join(BACKEND_DIR, 'texts', '唐宋传奇选.txt');
 const DOCUMENT_DIR = path.join(BACKEND_DIR, 'data', 'doc');
+const DOCUMENT_EXPECTED_COUNT = 962;
 const JSON_THEME = '新导入';
 const DOCUMENT_THEME_PREFIX = '文档导入：';
 const DEFAULT_IMAGE = 'https://img.zcool.cn/community/01e3c85e1f6f5da80120a8957c7227.jpg';
@@ -256,16 +257,27 @@ function transformDocumentRow(row: DocumentSourceRow, sourceFile: string): Parse
   };
 }
 
+function listDocumentJsonFiles(dirPath: string): string[] {
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  return entries.flatMap((entry) => {
+    const entryPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) return listDocumentJsonFiles(entryPath);
+    return entry.isFile() && entry.name.endsWith('.json') ? [entryPath] : [];
+  }).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+}
+
 function readDocumentSources(dirPath = DOCUMENT_DIR): ParsedDocumentEntry[] {
   if (!fs.existsSync(dirPath)) throw new Error(`补充文集目录不存在: ${dirPath}`);
-  const files = fs.readdirSync(dirPath).filter((file) => file.endsWith('.json')).sort();
+  // tmp.zip 拆分后的数据按书名放在子目录中，递归读取可以保留“每书一文件”的组织方式。
+  const files = listDocumentJsonFiles(dirPath);
   if (files.length === 0) throw new Error(`补充文集目录中没有 JSON 文件: ${dirPath}`);
 
   const entries: ParsedDocumentEntry[] = [];
   for (const file of files) {
-    const parsed = JSON.parse(fs.readFileSync(path.join(dirPath, file), 'utf8')) as unknown;
-    if (!Array.isArray(parsed)) throw new Error(`${file} 顶层必须是数组`);
-    entries.push(...(parsed as DocumentSourceRow[]).map((row) => transformDocumentRow(row, file)));
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
+    const sourceFile = path.relative(dirPath, file);
+    if (!Array.isArray(parsed)) throw new Error(`${sourceFile} 顶层必须是数组`);
+    entries.push(...(parsed as DocumentSourceRow[]).map((row) => transformDocumentRow(row, sourceFile)));
   }
   return entries;
 }
@@ -405,8 +417,8 @@ async function runImport(options: ImportOptions): Promise<void> {
   }
   if (new Set(ignoredTitles).size !== ignoredTitles.length) throw new Error('Excel 中存在重复篇名');
 
-  if (documentRows.length !== 523) {
-    throw new Error(`补充文集数量异常：读取到 ${documentRows.length} 条（预期 523）`);
+  if (documentRows.length !== DOCUMENT_EXPECTED_COUNT) {
+    throw new Error(`补充文集数量异常：读取到 ${documentRows.length} 条（预期 ${DOCUMENT_EXPECTED_COUNT}）`);
   }
   const occupiedTitles = new Set([...jsonTitles, ...excelTitles]);
   const ignoredDocumentRows: ParsedDocumentEntry[] = [];
@@ -435,8 +447,10 @@ async function runImport(options: ImportOptions): Promise<void> {
   if (existingJsonBooks.length !== 0 && existingJsonBooks.length !== jsonRows.length) {
     throw new Error(`数据库中标记为“${JSON_THEME}”的书有 ${existingJsonBooks.length} 本，源数据有 ${jsonRows.length} 本；为避免错误关联，已停止导入`);
   }
-  if (existingDocumentBooks.length !== 0 && existingDocumentBooks.length !== selectedDocumentRows.length) {
-    throw new Error(`数据库中补充文集有 ${existingDocumentBooks.length} 本，当前应导入 ${selectedDocumentRows.length} 本；为避免错误关联，已停止导入`);
+  const existingDocumentTitles = existingDocumentBooks.map((book) => book.title);
+  const duplicateExistingDocuments = existingDocumentTitles.filter((title, index) => existingDocumentTitles.indexOf(title) !== index);
+  if (duplicateExistingDocuments.length) {
+    throw new Error(`数据库中补充文集存在重复标题: ${[...new Set(duplicateExistingDocuments)].join('、')}`);
   }
 
   const selectedMatches = await prisma.book.findMany({
@@ -451,6 +465,12 @@ async function runImport(options: ImportOptions): Promise<void> {
   }
 
   const existingDocumentMap = new Map(existingDocumentBooks.map((book) => [book.title, book]));
+  const missingDocumentSources = existingDocumentBooks
+    .filter((book) => !selectedDocumentTitles.has(book.title))
+    .map((book) => book.title);
+  if (missingDocumentSources.length) {
+    throw new Error(`数据库中已有补充文集不在当前源数据内: ${missingDocumentSources.join('、')}`);
+  }
   const unrelatedDocumentMatches = await prisma.book.findMany({
     where: {
       title: { in: [...selectedDocumentTitles] },
