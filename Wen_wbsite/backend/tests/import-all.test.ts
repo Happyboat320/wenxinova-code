@@ -19,7 +19,7 @@ describe('一键导入数据源', () => {
     expect(jsonRows).toHaveLength(24_987);
     expect(excelRows).toHaveLength(39);
     expect(textRows).toHaveLength(39);
-    expect(documentRows).toHaveLength(962);
+    expect(documentRows).toHaveLength(523);
     expect(textRows.map((row) => row.title)).toEqual(excelRows.map((row) => row.title));
 
     const jsonTitles = new Set(jsonRows.map((row) => row.title));
@@ -38,7 +38,7 @@ describe('一键导入数据源', () => {
       occupiedTitles.add(title);
       return true;
     });
-    expect(importableDocuments).toHaveLength(779);
+    expect(importableDocuments).toHaveLength(340);
   });
 
   it('解析多行注释并忽略重复编号', () => {
@@ -63,6 +63,7 @@ describe('整本作品回目导入', () => {
   it('识别常见中文回目编号并将前置篇章置顶', () => {
     expect(chapterNumber('第卅三出 神诉')).toBe(33);
     expect(chapterNumber('闰二十出 闲话')).toBe(20);
+    expect(chapterNumber('春秋配（第1则）')).toBeNull();
     expect(chapterNumber('桃花扇小引')).toBeNull();
     expect(sortChapterRows([
       { 题目: '序' },
@@ -107,5 +108,13 @@ describe('整本作品回目导入', () => {
     });
     expect(officialdom).toHaveLength(60);
     expect(officialdom[0].title.startsWith('第一回')).toBe(true);
+    const purpleHairpin = readCollection({
+      file: 'tmp/紫钗记.json', title: '紫钗记', author: '汤显祖', dynasty: '明',
+      category: '传奇', unit: '出/篇', expectedCount: 53,
+    });
+    expect(purpleHairpin).toHaveLength(53);
+    expect(purpleHairpin.slice(0, 3).map(chapter => chapter.title)).toEqual([
+      '紫钗记第一出　本传开宗', '紫钗记第二出 春日言怀', '紫钗记第三出　插钗新赏',
+    ]);
   });
 });

@@ -29,11 +29,12 @@ interface CollectionDefinition {
   author: string;
   dynasty: string;
   category: string;
-  unit: '回' | '出/篇';
+  unit: string;
   expectedCount: number;
+  cleanupDocumentTheme?: string;
 }
 
-const COLLECTIONS: CollectionDefinition[] = [
+const BASE_COLLECTIONS: CollectionDefinition[] = [
   // 归入书库已有“传奇”分类，避免与同义的“明清传奇”拆成两个筛选项。
   { file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 50 },
   { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 53 },
@@ -44,6 +45,29 @@ const COLLECTIONS: CollectionDefinition[] = [
   { file: '大唐狄公案.json', title: '大唐狄公案', author: '高罗佩', dynasty: '现代', category: '公案小说', unit: '出/篇', expectedCount: 88 },
   { file: '大宋中兴通俗演义.json', title: '大宋中兴通俗演义', author: '熊大木', dynasty: '明', category: '历史演义', unit: '回', expectedCount: 74 },
 ];
+
+const TMP_COLLECTIONS: CollectionDefinition[] = [
+  { file: 'tmp/八段锦.json', title: '八段锦', author: '佚名', dynasty: '明末', category: '世情小说', unit: '段/篇', expectedCount: 8 },
+  { file: 'tmp/包公演义.json', title: '包公演义', author: '佚名', dynasty: '明', category: '公案小说', unit: '回', expectedCount: 100 },
+  { file: 'tmp/南柯记.json', title: '南柯记', author: '汤显祖', dynasty: '明', category: '传奇', unit: '出/篇', expectedCount: 44 },
+  { file: 'tmp/新增才子九云记.json', title: '新增才子九云记', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 31 },
+  { file: 'tmp/春秋配.json', title: '春秋配', author: '佚名', dynasty: '清初', category: '世情小说', unit: '回/篇', expectedCount: 16 },
+  { file: 'tmp/牡丹亭.json', title: '牡丹亭', author: '汤显祖', dynasty: '明', category: '传奇', unit: '出/篇', expectedCount: 55 },
+  { file: 'tmp/皇明诸司廉明奇判公案.json', title: '皇明诸司廉明奇判公案', author: '余象斗编刊', dynasty: '明', category: '公案小说', unit: '则/篇', expectedCount: 59 },
+  { file: 'tmp/紫钗记.json', title: '紫钗记', author: '汤显祖', dynasty: '明', category: '传奇', unit: '出/篇', expectedCount: 53 },
+  { file: 'tmp/蜜蜂计.json', title: '蜜蜂计', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 5 },
+  { file: 'tmp/蜜蜂记.json', title: '蜜蜂记', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 5 },
+  { file: 'tmp/蝴蝶杯.json', title: '蝴蝶杯', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 10 },
+  { file: 'tmp/邯郸记.json', title: '邯郸记', author: '汤显祖', dynasty: '明', category: '传奇', unit: '出/篇', expectedCount: 30 },
+  { file: 'tmp/霞笺记.json', title: '霞笺记', author: '佚名', dynasty: '明末清初', category: '世情小说', unit: '回', expectedCount: 11 },
+  { file: 'tmp/鸳鸯配.json', title: '鸳鸯配', author: '佚名', dynasty: '清初', category: '世情小说', unit: '回/篇', expectedCount: 12 },
+].map(definition => ({
+  ...definition,
+  // 这些书曾被误按单篇补充文集导入，聚合导入前先清理对应旧主题。
+  cleanupDocumentTheme: `文档导入：${definition.title}`,
+}));
+
+const COLLECTIONS: CollectionDefinition[] = [...BASE_COLLECTIONS, ...TMP_COLLECTIONS];
 
 function clean(value: unknown): string {
   return value === undefined || value === null ? '' : String(value).replace(/\r\n/g, '\n').trim();
@@ -72,7 +96,7 @@ export function chineseNumber(value: string): number | null {
 }
 
 export function chapterNumber(title: string): number | null {
-  const match = title.match(/(?:第|闰|加)([零〇一二两三四五六七八九十百廿卅卌\d]+)/);
+  const match = title.match(/(?:第|闰|加)([零〇一二两三四五六七八九十百廿卅卌\d]+)(?:回|出|段|卷)/);
   return match ? chineseNumber(match[1]) : null;
 }
 
@@ -173,7 +197,14 @@ async function createBackup(): Promise<string> {
 
 export async function runImport(options: { dryRun: boolean; backup: boolean }): Promise<void> {
   const sources = COLLECTIONS.map(definition => ({ definition, chapters: readCollection(definition) }));
+  const cleanupThemes = COLLECTIONS
+    .map(definition => definition.cleanupDocumentTheme)
+    .filter((theme): theme is string => Boolean(theme));
+  const cleanupCount = cleanupThemes.length
+    ? await prisma.book.count({ where: { theme: { in: cleanupThemes } } })
+    : 0;
   console.log(sources.map(({ definition, chapters }) => `${definition.title}：${chapters.length} ${definition.unit}`).join('\n'));
+  if (cleanupCount) console.log(`将清理误按单篇导入的旧记录：${cleanupCount} 部`);
   if (options.dryRun) {
     console.log('Dry-run 校验通过，未修改数据库。');
     return;
@@ -183,6 +214,11 @@ export async function runImport(options: { dryRun: boolean; backup: boolean }): 
   if (backupPath) console.log(`数据库已备份：${backupPath}`);
 
   await prisma.$transaction(async tx => {
+    if (cleanupThemes.length) {
+      // 聚合导入是唯一来源，先清理旧的单篇 Book，避免文库中出现同一作品的散篇副本。
+      await tx.book.deleteMany({ where: { theme: { in: cleanupThemes } } });
+    }
+
     for (const { definition, chapters } of sources) {
       const description = `《${definition.title}》整本阅读，共收录 ${chapters.length} ${definition.unit}；可在阅读页切换回目。`;
       const summary = `${description}\n${chapters.map(chapter => chapter.title).join('、')}`;
