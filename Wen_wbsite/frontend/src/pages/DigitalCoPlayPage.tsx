@@ -74,6 +74,7 @@ export default function DigitalCoPlayPage() {
   const { isDark } = useTheme();
   const { user, isInitializing, openLogin } = useContext(AuthContext);
   const jinlingLetterRef = useRef<JinlingLetterDialogueHandle>(null);
+  const theaterScrollRef = useRef<HTMLDivElement>(null);
   const [activePanel, setActivePanel] = useState<CoPlayPanel>('dialogue');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [favorites, setFavorites] = useState<api.FavoriteCharacter[]>([]);
@@ -93,6 +94,17 @@ export default function DigitalCoPlayPage() {
     () => scenePresets.find(preset => preset.name === activeScenePresetName) || scenePresets[0],
     [activeScenePresetName],
   );
+
+  const centerTheater = () => {
+    const scrollArea = theaterScrollRef.current;
+    if (scrollArea) scrollArea.scrollLeft = (scrollArea.scrollWidth - scrollArea.clientWidth) / 2;
+  };
+
+  useEffect(() => {
+    // 切换场景后从画面中央开始浏览，用户仍可左右拖动查看完整舞台。
+    const frame = window.requestAnimationFrame(centerTheater);
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeScenePresetName, activePanel]);
 
   const activeFavorite = useMemo(
     () => favorites.find(character => character.id === activeFavoriteId) || favorites[0] || null,
@@ -361,14 +373,31 @@ export default function DigitalCoPlayPage() {
 
   const renderTheaterPanel = () => (
     <section className="relative h-[calc(100dvh-9.5rem)] min-h-[560px] overflow-hidden bg-stone-100 md:h-full md:min-h-0">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="flex h-full w-full justify-center">
+      <div
+        ref={theaterScrollRef}
+        className="absolute inset-0 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:thin] md:overflow-hidden"
+        aria-label="可左右滚动查看完整舞台"
+      >
+        <div className="relative h-full w-max md:w-full">
           <img
             src={activeScenePreset.imageSrc}
             alt={`${activeScenePreset.name}插图`}
-            className="h-full w-full select-none object-cover"
+            className="h-full w-auto max-w-none select-none md:w-full md:object-cover"
             draggable={false}
+            onLoad={centerTheater}
           />
+
+          {activeScenePreset.name === '红楼梦' && (
+            <button
+              type="button"
+              onClick={() => jinlingLetterRef.current?.init()}
+              className="absolute left-[38%] top-[56%] z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-100/90 bg-stone-950/55 text-lg font-semibold text-amber-50 shadow-lg shadow-stone-950/30 outline-none backdrop-blur transition hover:scale-105 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-2 focus-visible:ring-amber-100"
+              aria-label="打开标号1潇湘馆黛玉葬花剧情"
+              title="潇湘馆・黛玉葬花"
+            >
+              1
+            </button>
+          )}
         </div>
       </div>
 
@@ -406,22 +435,11 @@ export default function DigitalCoPlayPage() {
       </div>
 
       {activeScenePreset.name === '红楼梦' && (
-        <>
-          <button
-            type="button"
-            onClick={() => jinlingLetterRef.current?.init()}
-            className="absolute left-[38%] top-[56%] z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-100/90 bg-stone-950/55 text-lg font-semibold text-amber-50 shadow-lg shadow-stone-950/30 outline-none backdrop-blur transition hover:scale-105 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-2 focus-visible:ring-amber-100"
-            aria-label="打开标号1潇湘馆黛玉葬花剧情"
-            title="潇湘馆・黛玉葬花"
-          >
-            1
-          </button>
-          <JinlingLetterDialogue
-            ref={jinlingLetterRef}
-            favorites={favorites}
-            onComplete={() => toast.success('剧情结束')}
-          />
-        </>
+        <JinlingLetterDialogue
+          ref={jinlingLetterRef}
+          favorites={favorites}
+          onComplete={() => toast.success('剧情结束')}
+        />
       )}
     </section>
   );

@@ -864,6 +864,6 @@ body {
   .home-depth-ring.ring-2 { width: 135vw; height: 135vw; }
   .home-depth-ring.ring-3 { width: 100vw; height: 100vw; }
   .home-depth-ring.ring-4 { width: 108vw; height: 108vw; }
-  .home-cover-orbit { --cover-width: clamp(45px, 14vw, 64px); --cover-height: clamp(63px, 19.6vw, 90px); opacity: .55; }
-  .home-cover-orbit.depth-3, .home-cover-orbit.depth-4 { display: none; }
+  /* 手机屏幕空间有限，隐藏全部旋转书封面，保留轻量的纸张圆环底纹。 */
+  .home-cover-orbit { display: none; }
 }
