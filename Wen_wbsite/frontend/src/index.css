@@ -579,6 +579,14 @@ body {
   border: 1px solid rgba(186,137,66,.2);
 }
 
+.home-footer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 1.5rem;
+}
+
 .home-orbit-background {
   position: fixed;
   z-index: 0;
@@ -844,7 +852,12 @@ body {
   .home-function-card > div > div:first-child > div { width: 3.5rem; height: 3.5rem; }
   .home-function-card h3 { font-size: 1.35rem; }
   .home-feature-card { padding: 1.25rem; }
-  .home-features-section footer { position: static; margin-top: 2rem; padding: 1rem .5rem 0; line-height: 1.8; }
+  .home-footer {
+    position: relative;
+    width: 100%;
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+    line-height: 1.8;
+  }
 
   .home-disc-rings { width: 150vw; height: 150vw; min-width: 0; min-height: 0; }
   .home-depth-ring.ring-1 { width: 170vw; height: 170vw; }

@@ -291,10 +291,12 @@ export default function Home() {
                     </div>
                 </motion.div>
 
-                <footer className="home-foreground absolute bottom-0 left-0 right-0 p-6 text-center text-sm opacity-70">
-                    <p>© 2025 文心新述 - 古典小说智能改编平台 | 以科技传承文化经典</p>
-                </footer>
             </section>
+
+            {/* 页脚独立于特色区，手机端不会成为该区横向布局中的一列。 */}
+            <footer className="home-footer home-foreground text-center text-sm opacity-70">
+                <p>© 2025 文心新述 - 古典小说智能改编平台 | 以科技传承文化经典</p>
+            </footer>
         </div>
     );
 }
