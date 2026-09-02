@@ -843,8 +843,13 @@ body {
   .home-function-card > div > div:first-child { margin-bottom: 1rem; }
   .home-function-card > div > div:first-child > div { width: 3.5rem; height: 3.5rem; }
   .home-function-card h3 { font-size: 1.35rem; }
-  .home-feature-card { padding: 1.25rem; }
-  .home-features-section footer { position: static; margin-top: 2rem; padding: 1rem .5rem 0; line-height: 1.8; }
+  /* 特色列表在手机端铺满视口，避免白底内容被外层卡片边距挤窄。 */
+  .home-features-section { padding-right: 0; padding-left: 0; align-items: flex-start; }
+  .home-features-section > .home-foreground { width: 100%; }
+  .home-features-section .home-section-heading { padding-inline: 1rem; }
+  .home-feature-card { width: 100%; border-right: 0; border-left: 0; border-radius: 0; padding: 1.25rem 1rem; }
+  /* 页脚作为最后一个普通流元素，始终位于特色内容之后。 */
+  .home-features-section footer { position: static; width: 100%; margin-top: 2rem; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); line-height: 1.8; }
 
   .home-disc-rings { width: 150vw; height: 150vw; min-width: 0; min-height: 0; }
   .home-depth-ring.ring-1 { width: 170vw; height: 170vw; }
