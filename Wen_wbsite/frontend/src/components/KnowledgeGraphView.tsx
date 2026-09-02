@@ -89,8 +89,9 @@ function RelationshipGraph({ data }: { data: api.KnowledgeGraph['relationships']
     return [node.id, { x: width / 2 + Math.cos(angle) * radius, y: height / 2 + Math.sin(angle) * radius }];
   })), [data.nodes]);
   return <div>
-    <div className="overflow-x-auto rounded-xl border border-amber-100 bg-[#fffdf8]">
-      <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[720px]" role="img" aria-label="人物关系图">
+    {/* 图形在手机端会因缩小而难以辨认，因此窄屏直接使用下方的语义化关系列表。 */}
+    <div className="hidden rounded-xl border border-amber-100 bg-[#fffdf8] sm:block">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label="人物关系图">
         <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#a16207" /></marker></defs>
         {data.edges.map((edge, index) => {
           const source = positions.get(edge.source); const target = positions.get(edge.target);

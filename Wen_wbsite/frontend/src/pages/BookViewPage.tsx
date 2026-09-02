@@ -1,11 +1,12 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import * as api from '@/api';
 import AdaptWorkspace from '@/components/AdaptWorkspace';
 import KnowledgeGraphView from '@/components/KnowledgeGraphView';
 import { AuthContext } from '@/contexts/authContext';
 import { useTheme } from '@/hooks/useTheme';
+import SiteHeader from '@/components/SiteHeader';
 
 type ReadingTab = 'original' | 'annotated' | 'translation';
 type PageTab = ReadingTab | 'adapt' | 'knowledge';
@@ -110,7 +111,7 @@ export default function BookViewPage() {
             [{annotationIndex}]
           </button>
           {content && (
-            <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-64 -translate-x-1/2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm font-normal leading-6 text-stone-700 shadow-xl group-hover:block group-focus-within:block">
+            <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-64 -translate-x-1/2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm font-normal leading-6 text-stone-700 shadow-xl sm:group-hover:block sm:group-focus-within:block">
               <strong className="mr-1 text-amber-800">[{annotationIndex}]</strong>{content}
               <span className="absolute left-1/2 top-full -translate-x-1/2 border-8 border-transparent border-t-amber-200" />
             </span>
@@ -138,20 +139,9 @@ export default function BookViewPage() {
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-stone-950 text-stone-100' : 'bg-[#f8f5ef] text-stone-800'}`}>
-      <header className={`flex flex-wrap items-center justify-between gap-5 px-6 py-5 lg:px-12 ${isDark ? 'border-stone-800' : 'border-amber-100/80'} border-b`}>
-        <Link to="/" className="flex items-center gap-2 text-amber-900">
-          <i className="fa-solid fa-book-open text-2xl" />
-          <span className="font-serif text-2xl font-bold tracking-wide">文心新述</span>
-        </Link>
-        <nav className="flex flex-wrap items-center gap-6 text-sm sm:text-base">
-          <button onClick={() => navigate('/classical-library')} className="text-stone-500 transition hover:text-amber-800">← 返回文库</button>
-          <Link to="/" className="transition hover:text-amber-800">首页</Link>
-          <Link to="/classical-library" className="border-b-2 border-amber-700 pb-1 text-amber-800">古典文库</Link>
-          <Link to="/digital-coplay" className="transition hover:text-amber-800">数字共演</Link>
-          <Link to="/ugc-community" className="transition hover:text-amber-800">UGC社区</Link>
-          <Link to="/my-collection" className="transition hover:text-amber-800">我的创作</Link>
-        </nav>
-      </header>
+      <div className={`border-b px-4 py-4 sm:px-6 lg:px-12 ${isDark ? 'border-stone-800' : 'border-amber-100/80'}`}>
+        <SiteHeader beforeNavigation={<button onClick={() => navigate('/classical-library')} className="text-stone-500 transition hover:text-amber-800">← 返回文库</button>} />
+      </div>
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <div className="mb-7 text-center">
@@ -162,7 +152,7 @@ export default function BookViewPage() {
 
         {bookData.chapters.length > 0 && bookData.chapter && (
           <section className={`mb-7 rounded-xl border p-4 shadow-sm ${isDark ? 'border-stone-700 bg-stone-900' : 'border-amber-200 bg-white'}`} aria-label="回目切换">
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center sm:justify-center">
               <button
                 type="button"
                 disabled={activeChapterIndex <= 0}
@@ -176,7 +166,7 @@ export default function BookViewPage() {
                 id="chapter-select"
                 value={bookData.chapter.id}
                 onChange={event => changeChapter(Number(event.target.value))}
-                className={`min-w-[20rem] max-w-full rounded-lg border border-amber-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDark ? 'bg-stone-800 text-stone-100' : 'bg-amber-50/60 text-stone-800'}`}
+                className={`order-first col-span-2 w-full rounded-lg border border-amber-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 sm:order-none sm:w-auto sm:min-w-[20rem] ${isDark ? 'bg-stone-800 text-stone-100' : 'bg-amber-50/60 text-stone-800'}`}
               >
                 {bookData.chapters.map(chapter => (
                   <option key={chapter.id} value={chapter.id}>{chapter.title}</option>
@@ -199,16 +189,16 @@ export default function BookViewPage() {
           </section>
         )}
 
-        <div className="mb-8 flex justify-center border-b border-amber-200/70">
+        <div className="mb-8 grid grid-cols-3 border-b border-amber-200/70">
           <button onClick={() => { if (!readingActive) setActiveTab('original'); }}
-            className={`px-8 py-3 transition ${readingActive ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>
+            className={`px-2 py-3 text-sm transition sm:px-8 sm:text-base ${readingActive ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>
             阅读文本
           </button>
           <button onClick={() => setActiveTab('adapt')}
-            className={`px-8 py-3 transition ${activeTab === 'adapt' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>
+            className={`px-2 py-3 text-sm transition sm:px-8 sm:text-base ${activeTab === 'adapt' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>
             创意工坊
           </button>
-          <button onClick={() => setActiveTab('knowledge')} className={`px-8 py-3 transition ${activeTab === 'knowledge' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>知识图谱</button>
+          <button onClick={() => setActiveTab('knowledge')} className={`px-2 py-3 text-sm transition sm:px-8 sm:text-base ${activeTab === 'knowledge' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>知识图谱</button>
         </div>
 
         {readingActive ? (
@@ -224,7 +214,7 @@ export default function BookViewPage() {
             </div>
 
             {activeTab === 'translation' ? (
-              <div className="min-h-[420px] rounded-lg border border-stone-100 bg-[#fffefa] p-6 font-serif text-lg leading-9">
+              <div className="min-h-[320px] break-words rounded-lg border border-stone-100 bg-[#fffefa] p-4 font-serif text-base leading-8 sm:min-h-[420px] sm:p-6 sm:text-lg sm:leading-9">
                 {translationLoading ? '正在生成译文…' : translation ? <div className="whitespace-pre-wrap">{translation}</div> : (
                   <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 text-stone-400">
                     <i className="fa-regular fa-file-lines text-3xl" />
@@ -235,7 +225,7 @@ export default function BookViewPage() {
               </div>
             ) : (
               <>
-                <article className="min-h-[420px] whitespace-pre-wrap rounded-lg border border-stone-100 bg-[#fffefa] p-6 font-serif text-lg leading-9 sm:p-8">
+                <article className="min-h-[320px] whitespace-pre-wrap break-words rounded-lg border border-stone-100 bg-[#fffefa] p-4 font-serif text-base leading-8 sm:min-h-[420px] sm:p-8 sm:text-lg sm:leading-9">
                   {renderText(bookData.content, activeTab === 'annotated')}
                 </article>
                 {activeTab === 'annotated' && (
@@ -253,7 +243,7 @@ export default function BookViewPage() {
                     ) : <p className="text-sm text-stone-500">本篇暂未收录注释。</p>}
                   </aside>
                 )}
-                <p className="mt-4 text-sm text-stone-400">提示：切换到“原文 + 注释”，悬停或聚焦注释序号即可查看释义。</p>
+                <p className="mt-4 text-sm text-stone-400"><span className="sm:hidden">提示：手机端可在正文下方的注释列表集中查看释义。</span><span className="hidden sm:inline">提示：悬停或聚焦注释序号即可查看释义。</span></p>
               </>
             )}
           </section>

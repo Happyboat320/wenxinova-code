@@ -104,9 +104,9 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-[#fffdf9] text-stone-800 shadow-2xl">
-        <div className="flex items-start justify-between px-8 pt-7">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-950/45 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <div className="max-h-[94dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-[#fffdf9] text-stone-800 shadow-2xl sm:rounded-2xl">
+        <div className="flex items-start justify-between px-5 pt-6 sm:px-8 sm:pt-7">
           <div>
             <h3 id="auth-title" className="font-serif text-2xl font-semibold text-amber-900">欢迎来到文心新述</h3>
             <p className="mt-1 text-sm text-stone-500">登录只需手机号和密码，注册时请设置账号昵称</p>
@@ -116,7 +116,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
           </button>
         </div>
 
-        <div className="mx-8 mt-6 grid grid-cols-2 rounded-lg bg-amber-50 p-1">
+        <div className="mx-5 mt-6 grid grid-cols-2 rounded-lg bg-amber-50 p-1 sm:mx-8">
           {(['login', 'register'] as const).map(item => (
             <button key={item} type="button" onClick={() => switchMode(item)}
               className={`rounded-md py-2 text-sm font-medium transition ${mode === item ? 'bg-white text-amber-800 shadow-sm' : 'text-stone-500 hover:text-amber-800'}`}>
@@ -125,7 +125,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
           ))}
         </div>
 
-        <form onSubmit={submit} className="space-y-4 px-8 pb-8 pt-6">
+        <form onSubmit={submit} className="space-y-4 px-5 pb-6 pt-5 sm:px-8 sm:pb-8 sm:pt-6">
           {mode === 'register' && (
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium">用户名</span>

@@ -324,7 +324,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
   return (
     <div className="mx-auto max-w-[1440px]">
       <div className="mb-7 text-center">
-        <h2 className="title-serif text-3xl">{title} - {mode === 'style' ? '风格化改编' : '剧本杀创作'}</h2>
+        <h2 className="title-serif text-2xl sm:text-3xl">{title} - {mode === 'style' ? '风格化改编' : '剧本杀创作'}</h2>
         {(mode !== 'style' || author.trim()) && (
           <p className="mt-1 text-gray-500">{mode === 'style' ? `作者：${author}` : '将经典名著改编为互动剧本杀体验'}</p>
         )}
@@ -335,7 +335,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
       </div>
 
       {mode === 'style' ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(260px,0.85fr)_minmax(380px,1.2fr)_minmax(220px,0.65fr)]">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(260px,0.85fr)_minmax(380px,1.2fr)_minmax(220px,0.65fr)] lg:gap-6">
           <OriginalPanel className={panel} text={originalText} />
           <OutputPanel
             className={panel}
@@ -360,7 +360,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
           </section>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(280px,0.75fr)_minmax(560px,1.75fr)]">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(280px,0.75fr)_minmax(560px,1.75fr)] lg:gap-6">
           <OriginalPanel className={panel} text={originalText} />
           <div>
             <div className="mb-6 grid grid-cols-3 border-b border-amber-200">
@@ -370,7 +370,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
             </div>
             {scriptSection === 'role' && (
               <div className="mb-6">
-                <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <p className="text-sm text-gray-500">选择角色后生成其背景、秘密、目标、关系和行动时间线</p>
                   <button onClick={analyzeCharacters} disabled={analyzingCharacters} className="btn-secondary shrink-0 disabled:opacity-50"><i className="fa-solid fa-users-viewfinder mr-2" />{analyzingCharacters ? '分析中...' : roleOptions.length ? '重新分析角色' : 'AI 分析角色'}</button>
                 </div>
@@ -400,10 +400,10 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
         </div>
       )}
 
-      <div className="mt-6 flex justify-center gap-4">
-        <button onClick={() => void persist('draft')} disabled={!result.trim() || saving || publishing || draftLoading || Boolean(contentUnchanged)} className="btn-secondary min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-floppy-disk mr-2" />{saving ? '保存中...' : '保存'}</button>
-        <button onClick={() => void persist('publish')} disabled={!result.trim() || saving || publishing || draftLoading || ((persistedVersion?.status === 'published' || persistedVersion?.status === 'pending') && contentUnchanged)} className="btn-primary min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-paper-plane mr-2" />{publishing ? '提交中...' : user?.role === 'admin' ? '发布' : '提交审核'}</button>
-        <button onClick={exportResult} disabled={!result.trim()} className="btn-secondary min-w-40 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-download mr-2" />导出</button>
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:flex sm:justify-center sm:gap-4">
+        <button onClick={() => void persist('draft')} disabled={!result.trim() || saving || publishing || draftLoading || Boolean(contentUnchanged)} className="btn-secondary sm:min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-floppy-disk mr-2" />{saving ? '保存中...' : '保存'}</button>
+        <button onClick={() => void persist('publish')} disabled={!result.trim() || saving || publishing || draftLoading || ((persistedVersion?.status === 'published' || persistedVersion?.status === 'pending') && contentUnchanged)} className="btn-primary sm:min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-paper-plane mr-2" />{publishing ? '提交中...' : user?.role === 'admin' ? '发布' : '提交审核'}</button>
+        <button onClick={exportResult} disabled={!result.trim()} className="btn-secondary sm:min-w-40 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-download mr-2" />导出</button>
       </div>
 
       {continuationDialogOpen && (
@@ -448,7 +448,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
 }
 
 function OriginalPanel({ className, text }: { className: string; text: string }) {
-  return <section className={`${className} p-6`}><h3 className="mb-4 text-xl font-medium"><i className="fa-solid fa-bookmark mr-2 text-amber-700" />原文</h3><div className="h-[620px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-amber-200 p-5 font-serif text-lg leading-8">{text || '暂无原文'}</div></section>;
+  return <section className={`${className} min-w-0 p-4 sm:p-6`}><h3 className="mb-4 text-xl font-medium"><i className="fa-solid fa-bookmark mr-2 text-amber-700" />原文</h3><div className="h-[55dvh] min-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-amber-200 p-4 font-serif text-base leading-8 sm:h-[620px] sm:p-5 sm:text-lg">{text || '暂无原文'}</div></section>;
 }
 
 function OutputPanel({ className, title, result, onChange, loading, onGenerate, continuation }: {
@@ -464,7 +464,7 @@ function OutputPanel({ className, title, result, onChange, loading, onGenerate, 
   const [continuationMenuOpen, setContinuationMenuOpen] = useState(false);
 
   return (
-    <section className={`${className} p-6`}>
+    <section className={`${className} min-w-0 p-4 sm:p-6`}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-xl font-medium"><i className="fa-solid fa-pen-to-square mr-2 text-amber-700" />{title}</h3>
         <div className="flex items-center gap-2">
@@ -476,11 +476,11 @@ function OutputPanel({ className, title, result, onChange, loading, onGenerate, 
         </div>
       </div>
       {preview ? (
-        <div className="h-[620px] overflow-y-auto rounded-lg border border-gray-200 p-5">
+        <div className="h-[55dvh] min-h-80 overflow-y-auto break-words rounded-lg border border-gray-200 p-4 sm:h-[620px] sm:p-5">
           {result.trim() ? <MarkdownContent content={result} /> : <p className="text-gray-400">生成内容后可在这里预览 Markdown 排版效果。</p>}
         </div>
       ) : (
-        <textarea value={result} onChange={event => onChange(event.target.value)} className="h-[620px] w-full resize-none rounded-lg border border-gray-200 p-5 leading-8 focus:outline-none focus:ring-2 focus:ring-amber-400" placeholder={loading ? 'AI 正在创作，请稍候…' : '生成的内容将显示在这里，生成后可以继续编辑…'} />
+        <textarea value={result} onChange={event => onChange(event.target.value)} className="h-[55dvh] min-h-80 w-full resize-none rounded-lg border border-gray-200 p-4 leading-8 focus:outline-none focus:ring-2 focus:ring-amber-400 sm:h-[620px] sm:p-5" placeholder={loading ? 'AI 正在创作，请稍候…' : '生成的内容将显示在这里，生成后可以继续编辑…'} />
       )}
       {continuation && (
         <div className="relative mt-4 flex justify-center">

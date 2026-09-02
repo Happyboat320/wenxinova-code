@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from "@/hooks/useTheme";
 import * as api from "@/api";
+import SiteHeader from '@/components/SiteHeader';
 
 type Book = {
   id: number;
@@ -99,26 +100,14 @@ const LibraryPage = () => {
   };
 
   return (
-    <div className={`min-h-screen min-w-[1440px] p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
+    <div className={`min-h-screen px-4 py-5 sm:p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
       {/* 顶部导航 */}
-      <header className="mb-12 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <i className="fa-solid fa-book-open text-amber-800 text-2xl"></i>
-          <h1 className="text-2xl title-serif">文心新述</h1>
-        </div>
-        <nav className="flex gap-6">
-          <Link to="/" className="hover:text-amber-700 transition-colors">首页</Link>
-          <Link to="/classical-library" className="font-medium text-amber-800 border-b-2 border-amber-800 pb-1">古典文库</Link>
-          <Link to="/digital-coplay" className="hover:text-amber-700 transition-colors">数字共演</Link>
-          <Link to="/ugc-community" className="hover:text-amber-700 transition-colors">UGC社区</Link>
-          <Link to="/my-collection" className="hover:text-amber-700 transition-colors">我的创作</Link>
-        </nav>
-      </header>
+      <SiteHeader className="mb-8 sm:mb-12" />
 
       {/* 主内容区域 */}
       <main>
         <div className="mb-10 text-center">
-          <h2 className="text-4xl title-serif mb-4">古典文库</h2>
+          <h2 className="title-serif mb-4 text-3xl sm:text-4xl">古典文库</h2>
           <p className="text-lg opacity-80 max-w-3xl mx-auto">
             探索中国古典文学的瑰宝，每一部经典都蕴含着深厚的文化底蕴和独特的艺术魅力
           </p>
@@ -126,7 +115,7 @@ const LibraryPage = () => {
         </div>
 
         <div className={`mx-auto mb-9 max-w-3xl rounded-xl border border-amber-200 p-4 shadow-sm ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
-          <form onSubmit={submitSearch} className="flex gap-3" role="search">
+          <form onSubmit={submitSearch} className="flex flex-col gap-3 sm:flex-row" role="search">
             <label htmlFor="library-search" className="sr-only">检索标题、作者或梗概</label>
             <div className="relative min-w-0 flex-1">
               <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-amber-700" />
@@ -144,7 +133,7 @@ const LibraryPage = () => {
           </form>
 
           {/* 分类与关键词可组合筛选，分类项由后端按业务口径返回。 */}
-          <div className="mt-4 flex items-center gap-4">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             <label htmlFor="book-category" className="shrink-0 font-medium text-amber-800">
               <i className="fa-solid fa-layer-group mr-2" />题材体裁
             </label>
@@ -176,7 +165,7 @@ const LibraryPage = () => {
         )}
 
         <motion.div
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto"
+          className="mx-auto grid max-w-6xl grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-8"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
@@ -188,7 +177,7 @@ const LibraryPage = () => {
               variants={bookVariants}
               whileHover={{ y: -5 }}
             >
-              <div className="h-60 overflow-hidden relative">
+              <div className="relative h-52 overflow-hidden sm:h-60">
                 <img
                   src={book.image || "/library-covers/警世恒言通用.png"}
                   alt={book.title}

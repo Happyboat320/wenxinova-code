@@ -321,10 +321,10 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
       const active = currentLine.speaker === speaker;
       return (
         <div
-          className={`absolute bottom-7 top-24 z-10 flex items-end transition duration-300 ${
+          className={`absolute bottom-56 top-28 z-10 flex min-w-0 items-end transition duration-300 sm:bottom-7 sm:top-24 ${
             align === 'left'
-              ? 'left-[4%] justify-start w-[31%] min-w-[330px] max-w-[460px]'
-              : 'right-[4%] justify-end w-[31%] min-w-[330px] max-w-[460px]'
+              ? 'left-0 w-[48%] justify-start sm:left-[4%] sm:w-[31%] sm:min-w-[330px] sm:max-w-[460px]'
+              : 'right-0 w-[48%] justify-end sm:right-[4%] sm:w-[31%] sm:min-w-[330px] sm:max-w-[460px]'
           } ${active || currentLine.participant ? 'opacity-100 saturate-100' : 'opacity-55 saturate-75'}`}
         >
           {!portraitFailed[speaker] && (
@@ -366,7 +366,7 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
               advance();
             }
           }}
-          className="relative h-full min-h-[700px] overflow-hidden rounded-2xl border border-stone-900/15 bg-[#f7efe0]/82 text-stone-900 shadow-2xl shadow-stone-950/35 outline-none backdrop-blur-md transition focus-visible:ring-2 focus-visible:ring-amber-200"
+          className="relative h-full min-h-[540px] overflow-hidden rounded-xl border border-stone-900/15 bg-[#f7efe0]/82 text-stone-900 shadow-2xl shadow-stone-950/35 outline-none backdrop-blur-md transition focus-visible:ring-2 focus-visible:ring-amber-200 sm:min-h-[700px] sm:rounded-2xl"
         >
           <div
             className="pointer-events-none absolute inset-0 opacity-70"
@@ -379,9 +379,9 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-stone-950/25 via-stone-900/5 to-transparent" />
 
           <div className="relative h-full">
-            <div className="absolute left-1/2 top-5 z-20 -translate-x-1/2 rounded-full border border-stone-900/10 bg-[#fffaf0]/75 px-6 py-2 text-center shadow-sm backdrop-blur">
+            <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full border border-stone-900/10 bg-[#fffaf0]/75 px-3 py-2 text-center shadow-sm backdrop-blur sm:top-5 sm:px-6">
               <p className="text-xs font-medium uppercase tracking-[0.22em] text-stone-500">Plot Dialogue</p>
-              <h3 className="mt-0.5 whitespace-nowrap text-2xl font-semibold text-stone-950">潇湘馆・黛玉葬花</h3>
+              <h3 className="mt-0.5 whitespace-nowrap text-base font-semibold text-stone-950 sm:text-2xl">潇湘馆・黛玉葬花</h3>
             </div>
 
             {renderPortrait('宝玉', 'left')}
@@ -390,14 +390,14 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
             <div className="absolute left-1/2 top-28 z-10 h-40 w-40 -translate-x-1/2 rounded-full border border-emerald-900/10 bg-white/15 blur-[1px]" />
             <div className="absolute left-1/2 top-32 z-10 h-28 w-28 -translate-x-1/2 rounded-full border border-stone-900/10 bg-[#fffaf0]/30" />
 
-            <section className="absolute inset-x-[25%] bottom-8 z-30 mx-auto max-w-[840px] rounded-2xl border border-stone-900/15 bg-[#fffaf0]/90 p-6 shadow-2xl shadow-stone-950/30 backdrop-blur-md">
+            <section className="absolute inset-x-3 bottom-3 z-30 mx-auto max-w-[840px] rounded-xl border border-stone-900/15 bg-[#fffaf0]/94 p-3 shadow-2xl shadow-stone-950/30 backdrop-blur-md sm:inset-x-[25%] sm:bottom-8 sm:rounded-2xl sm:p-6">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-full border text-2xl font-semibold ${currentTone.ring}`}>
+                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border text-lg font-semibold sm:h-14 sm:w-14 sm:text-2xl ${currentTone.ring}`}>
                     {currentTone.avatar}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-2xl font-semibold text-stone-950">{currentTone.role}</p>
+                    <p className="truncate text-lg font-semibold text-stone-950 sm:text-2xl">{currentTone.role}</p>
                     <p className="text-xs text-stone-500">{ended ? '剧情结束' : '正在发言'}</p>
                   </div>
                 </div>
@@ -406,7 +406,7 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
                 </span>
               </div>
 
-              <p className="min-h-[144px] whitespace-pre-wrap rounded-xl border border-stone-900/10 bg-white/60 px-7 py-6 text-2xl leading-[2.05] text-stone-800 shadow-inner">
+              <p className="min-h-[104px] whitespace-pre-wrap break-words rounded-xl border border-stone-900/10 bg-white/60 px-4 py-3 text-base leading-8 text-stone-800 shadow-inner sm:min-h-[144px] sm:px-7 sm:py-6 sm:text-2xl sm:leading-[2.05]">
                 {shownContent}
                 {!ended && typedLength < currentLine.content.length && <span className="ml-0.5 animate-pulse text-amber-800">|</span>}
               </p>

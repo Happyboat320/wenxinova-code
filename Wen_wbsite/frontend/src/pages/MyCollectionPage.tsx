@@ -5,6 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { AuthContext } from '@/contexts/authContext';
 import MarkdownContent from '@/components/MarkdownContent';
 import * as api from '@/api';
+import SiteHeader from '@/components/SiteHeader';
 
 const categoryLabels: Record<api.CreationCategory, string> = {
   adaptation: '改编',
@@ -46,34 +47,22 @@ const MyCollectionPage = () => {
   const rejectedCount = creations.filter(creation => creation.status === 'rejected').length;
 
   return (
-    <div className={`min-h-screen p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
-      <header className="mb-12 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <i className="fa-solid fa-book-open text-amber-800 text-2xl" />
-          <h1 className="text-2xl title-serif">文心新述</h1>
-        </div>
-        <nav className="flex gap-6">
-          <Link to="/" className="hover:text-amber-700">首页</Link>
-          <Link to="/classical-library" className="hover:text-amber-700">古典文库</Link>
-          <Link to="/digital-coplay" className="hover:text-amber-700">数字共演</Link>
-          <Link to="/ugc-community" className="hover:text-amber-700">UGC社区</Link>
-          <Link to="/my-collection" className="font-medium text-amber-800 border-b-2 border-amber-800 pb-1">我的创作</Link>
-        </nav>
-      </header>
+    <div className={`min-h-screen px-4 py-5 sm:p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
+      <SiteHeader className="mb-8 sm:mb-12" />
 
       <main className="max-w-6xl mx-auto">
         <div className="mb-10 text-center">
-          <h2 className="text-4xl title-serif mb-4">我的创作</h2>
+          <h2 className="title-serif mb-4 text-3xl sm:text-4xl">我的创作</h2>
           <p className="text-lg opacity-80">查看通过 AI 改编、续写和创作的历史作品</p>
         </div>
 
         {user && (
-          <section className={`mx-auto mb-9 flex max-w-3xl items-center gap-5 rounded-2xl border border-amber-100 p-6 shadow-md ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+          <section className={`mx-auto mb-9 flex max-w-3xl flex-col items-center gap-5 rounded-2xl border border-amber-100 p-5 text-center shadow-md sm:flex-row sm:p-6 sm:text-left ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
             <Link to="/profile" className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-amber-100 text-2xl font-semibold text-amber-800 ring-4 ring-amber-50">
               {user.avatar ? <img src={user.avatar} alt="个人头像" className="h-full w-full object-cover" /> : (user.nickname?.charAt(0) || <i className="fa-solid fa-user" />)}
             </Link>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
                 <h3 className="truncate text-2xl font-semibold">{user.nickname || '未设置昵称'}</h3>
                 <Link to="/profile" className="shrink-0 text-sm text-amber-700 hover:underline">编辑资料</Link>
               </div>
@@ -84,7 +73,7 @@ const MyCollectionPage = () => {
 
         {user && (
           <div className="mb-8 flex justify-center">
-            <div className={`inline-flex flex-wrap justify-center rounded-xl border border-amber-200 p-1.5 ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className={`grid w-full grid-cols-2 rounded-xl border border-amber-200 p-1.5 sm:inline-flex sm:w-auto sm:flex-wrap sm:justify-center ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
               <button onClick={() => setSelectedStatus('draft')} className={`rounded-lg px-7 py-2.5 transition ${selectedStatus === 'draft' ? 'bg-amber-700 text-white shadow' : 'text-amber-800 hover:bg-amber-50'}`}>
                 <i className="fa-regular fa-file-lines mr-2" />草稿 <span className="ml-1 opacity-70">{draftCount}</span>
               </button>
@@ -121,8 +110,8 @@ const MyCollectionPage = () => {
 
         <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           {visibleCreations.map(creation => (
-            <article key={creation.id} className={`rounded-xl p-6 shadow-md border border-amber-100 ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
-              <div className="flex justify-between gap-4 mb-3">
+            <article key={creation.id} className={`rounded-xl border border-amber-100 p-4 shadow-md sm:p-6 ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:justify-between sm:gap-4">
                 <div>
                   <div className="mb-2 flex flex-wrap gap-2">
                     <span className="inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-800">{categoryLabels[creation.category] || '其他'}</span>

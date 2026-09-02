@@ -1,9 +1,9 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AuthContext } from '@/contexts/authContext';
 import { useTheme } from '@/hooks/useTheme';
 import JinlingLetterDialogue, { type JinlingLetterDialogueHandle } from '@/components/JinlingLetterDialogue';
+import SiteHeader from '@/components/SiteHeader';
 import * as api from '@/api';
 
 const MAX_CHARACTERS = 10;
@@ -259,7 +259,7 @@ export default function DigitalCoPlayPage() {
   const renderDialoguePanel = () => (
     <section className="mx-auto flex h-full min-h-0 max-w-5xl flex-col rounded-xl border border-stone-200 bg-white shadow-sm">
       <div className="border-b border-stone-100 px-6 py-4">
-        <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="mb-4 flex flex-wrap items-center gap-2 pb-1">
           {favorites.length === 0 && <span className="rounded-full bg-stone-100 px-3 py-1.5 text-sm text-stone-500">暂无收藏角色</span>}
           {favorites.map(character => (
             <button
@@ -289,7 +289,7 @@ export default function DigitalCoPlayPage() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-[#fbfbfa] px-8 py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-[#fbfbfa] px-4 py-5 sm:px-8 sm:py-6">
         {activeChatFavorite ? (
           <div className="space-y-5">
             {activeChatMessages.length === 0 && (
@@ -304,7 +304,7 @@ export default function DigitalCoPlayPage() {
             )}
             {activeChatMessages.map((message, index) => (
               <article key={`${message.createdAt}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[72%] rounded-2xl px-5 py-3 shadow-sm ${
+                <div className={`max-w-[90%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] sm:px-5 ${
                   message.role === 'user'
                     ? 'rounded-br-md bg-stone-900 text-white'
                     : 'rounded-bl-md border border-stone-200 bg-white text-stone-800'
@@ -360,26 +360,26 @@ export default function DigitalCoPlayPage() {
   );
 
   const renderTheaterPanel = () => (
-    <section className="relative h-full min-h-0 overflow-hidden bg-stone-100">
-      <div className="absolute inset-0 overflow-x-auto overflow-y-hidden">
-        <div className="flex h-full min-w-full w-max justify-center">
+    <section className="relative h-[calc(100dvh-9.5rem)] min-h-[560px] overflow-hidden bg-stone-100 md:h-full md:min-h-0">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="flex h-full w-full justify-center">
           <img
             src={activeScenePreset.imageSrc}
             alt={`${activeScenePreset.name}插图`}
-            className="h-full min-w-full max-w-none select-none object-cover"
+            className="h-full w-full select-none object-cover"
             draggable={false}
           />
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/45 via-black/20 to-transparent p-6">
-        <div className="pointer-events-auto flex items-start justify-between gap-5">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/55 via-black/20 to-transparent p-3 sm:p-6">
+        <div className="pointer-events-auto flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
           <div className="min-w-0 text-white drop-shadow">
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-amber-100">Theater</p>
-            <h2 className="mt-1 text-3xl font-semibold">数字共演剧场</h2>
+            <h2 className="mt-1 text-2xl font-semibold sm:text-3xl">数字共演剧场</h2>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <div className="grid grid-cols-4 gap-2 rounded-lg border border-white/20 bg-stone-950/35 p-2 backdrop-blur">
+          <div className="flex items-center gap-3 sm:shrink-0">
+            <div className="grid w-full grid-cols-2 gap-2 rounded-lg border border-white/20 bg-stone-950/35 p-2 backdrop-blur sm:w-auto sm:grid-cols-4">
               {scenePresets.map(preset => {
                 const active = activeScenePreset.name === preset.name;
                 return (
@@ -390,7 +390,7 @@ export default function DigitalCoPlayPage() {
                       setActiveScenePresetName(preset.name);
                       setScene(preset.text);
                     }}
-                    className={`h-11 min-w-20 rounded-md border px-3 text-sm font-medium transition ${
+                    className={`h-11 rounded-md border px-2 text-sm font-medium transition sm:min-w-20 sm:px-3 ${
                       active
                         ? 'border-amber-200 bg-amber-100 text-amber-950'
                         : 'border-white/25 bg-white/10 text-white hover:bg-white/20'
@@ -427,7 +427,7 @@ export default function DigitalCoPlayPage() {
   );
 
   const renderCharactersPanel = () => (
-    <section className="grid h-full min-h-0 grid-cols-[340px_minmax(0,1fr)] gap-5">
+    <section className="flex min-h-0 flex-col gap-4 md:grid md:h-full md:grid-cols-[340px_minmax(0,1fr)] md:gap-5">
       <aside className="flex min-h-0 flex-col rounded-lg border border-amber-100 bg-white p-5 shadow-sm">
         <div className="mb-5 flex items-center justify-between">
           <div>
@@ -504,7 +504,7 @@ export default function DigitalCoPlayPage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-[260px_minmax(0,1fr)] gap-5 p-6">
+        <div className="grid min-h-0 flex-1 gap-4 p-4 md:grid-cols-[260px_minmax(0,1fr)] md:gap-5 md:p-6">
           <div className="rounded-lg border border-amber-100 bg-amber-50/60 p-5">
             {activeFavorite ? (
               <>
@@ -557,20 +557,10 @@ export default function DigitalCoPlayPage() {
   );
 
   return (
-    <div className={`min-h-screen min-w-[1440px] ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
-      <header className="flex h-20 items-center justify-between border-b border-amber-100 bg-[#fbf7ef]/90 px-8 backdrop-blur">
-        <Link to="/" className="flex items-center gap-2">
-          <i className="fa-solid fa-book-open text-2xl text-amber-800" />
-          <h1 className="title-serif text-2xl">文心新述</h1>
-        </Link>
-        <nav className="flex gap-6">
-          <Link to="/" className="hover:text-amber-700">首页</Link>
-          <Link to="/classical-library" className="hover:text-amber-700">古典文库</Link>
-          <Link to="/digital-coplay" className="border-b-2 border-amber-800 pb-1 font-medium text-amber-800">数字共演</Link>
-          <Link to="/ugc-community" className="hover:text-amber-700">UGC社区</Link>
-          <Link to="/my-collection" className="hover:text-amber-700">我的创作</Link>
-        </nav>
-      </header>
+    <div className={`min-h-screen ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
+      <div className="h-16 border-b border-amber-100 bg-[#fbf7ef]/90 px-4 py-2.5 backdrop-blur sm:h-20 sm:px-8 sm:py-[18px]">
+        <SiteHeader />
+      </div>
 
       {!isInitializing && !user ? (
         <main className="grid min-h-[calc(100vh-5rem)] place-items-center p-8">
@@ -582,12 +572,12 @@ export default function DigitalCoPlayPage() {
         </main>
       ) : (
         <main
-          className={`grid h-[calc(100vh-5rem)] gap-0 transition-[grid-template-columns] duration-300 ${
-            sidebarCollapsed ? 'grid-cols-[72px_minmax(0,1fr)]' : 'grid-cols-[12.5%_minmax(0,1fr)]'
+          className={`flex min-h-[calc(100dvh-4rem)] flex-col gap-0 md:grid md:h-[calc(100vh-5rem)] md:min-h-0 md:transition-[grid-template-columns] md:duration-300 ${
+            sidebarCollapsed ? 'md:grid-cols-[72px_minmax(0,1fr)]' : 'md:grid-cols-[12.5%_minmax(0,1fr)]'
           }`}
         >
-          <aside className="flex min-h-0 flex-col border-r border-amber-100 bg-[#fffaf1]">
-            <div className="flex h-16 items-center justify-between border-b border-amber-100 px-4">
+          <aside className="flex min-h-0 flex-col border-b border-amber-100 bg-[#fffaf1] md:border-b-0 md:border-r">
+            <div className="hidden h-16 items-center justify-between border-b border-amber-100 px-4 md:flex">
               {!sidebarCollapsed && (
                 <div className="min-w-0">
                   <h2 className="truncate text-lg font-semibold text-amber-950">数字共演</h2>
@@ -604,7 +594,7 @@ export default function DigitalCoPlayPage() {
               </button>
             </div>
 
-            <nav className="space-y-2 p-3">
+            <nav className="grid grid-cols-3 gap-2 p-2 md:block md:space-y-2 md:p-3">
               {sidebarItems.map(item => {
                 const active = activePanel === item.key;
                 return (
@@ -613,13 +603,14 @@ export default function DigitalCoPlayPage() {
                     type="button"
                     onClick={() => setActivePanel(item.key)}
                     title={sidebarCollapsed ? item.label : undefined}
-                    className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition ${
+                    className={`flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-center transition md:flex-row md:gap-3 md:px-3 md:py-3 md:text-left ${
                       active ? 'border-amber-300 bg-white text-amber-900 shadow-sm' : 'border-transparent text-stone-600 hover:bg-white/70 hover:text-amber-900'
                     } ${sidebarCollapsed ? 'justify-center' : ''}`}
                   >
                     <i className={`fa-solid ${item.icon} w-5 text-center text-lg`} />
+                    <span className="text-xs md:hidden">{item.label}</span>
                     {!sidebarCollapsed && (
-                      <span className="min-w-0">
+                      <span className="hidden min-w-0 md:block">
                         <span className="block truncate font-medium">{item.label}</span>
                         <span className="block truncate text-xs text-stone-400">{item.summary}</span>
                       </span>
@@ -630,7 +621,7 @@ export default function DigitalCoPlayPage() {
             </nav>
 
             {!sidebarCollapsed && (
-              <div className="min-h-0 flex-1 border-t border-amber-100 p-3">
+              <div className="hidden min-h-0 flex-1 border-t border-amber-100 p-3 md:block">
                 <div className="mb-2 flex items-center justify-between px-1">
                   <span className="text-xs font-medium text-amber-900">聊天历史</span>
                   <span className="text-[11px] text-stone-400">{chatHistoryItems.length}</span>
@@ -659,13 +650,13 @@ export default function DigitalCoPlayPage() {
             )}
 
             {!sidebarCollapsed && (
-              <div className="border-t border-amber-100 p-4 text-xs text-stone-500">
+              <div className="hidden border-t border-amber-100 p-4 text-xs text-stone-500 md:block">
                 <p className="truncate">{user?.nickname || user?.phone || '当前用户'}</p>
               </div>
             )}
           </aside>
 
-          <section className={`min-h-0 overflow-hidden ${activePanel === 'theater' ? 'p-0' : 'p-6'}`}>
+          <section className={`min-h-0 flex-1 overflow-y-auto md:overflow-hidden ${activePanel === 'theater' ? 'p-0' : 'p-3 sm:p-6'}`}>
             {activePanel === 'dialogue' && renderDialoguePanel()}
             {activePanel === 'theater' && renderTheaterPanel()}
             {activePanel === 'characters' && renderCharactersPanel()}

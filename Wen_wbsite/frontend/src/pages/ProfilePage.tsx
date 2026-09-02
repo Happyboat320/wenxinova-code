@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { AuthContext } from '@/contexts/authContext';
 import { useTheme } from '@/hooks/useTheme';
 import * as api from '@/api';
+import SiteHeader from '@/components/SiteHeader';
 
 async function compressAvatar(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('请选择图片文件');
@@ -117,24 +118,12 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className={`min-h-screen p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
-      <header className="mb-12 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <i className="fa-solid fa-book-open text-2xl text-amber-800" />
-          <h1 className="title-serif text-2xl">文心新述</h1>
-        </Link>
-        <nav className="flex gap-6">
-          <Link to="/" className="hover:text-amber-700">首页</Link>
-          <Link to="/classical-library" className="hover:text-amber-700">古典文库</Link>
-          <Link to="/digital-coplay" className="hover:text-amber-700">数字共演</Link>
-          <Link to="/ugc-community" className="hover:text-amber-700">UGC社区</Link>
-          <Link to="/my-collection" className="hover:text-amber-700">我的创作</Link>
-        </nav>
-      </header>
+    <div className={`min-h-screen px-4 py-5 sm:p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
+      <SiteHeader className="mb-8 sm:mb-12" />
 
       <main className="mx-auto max-w-2xl">
         <div className="mb-8 text-center">
-          <h2 className="title-serif text-4xl">个人资料</h2>
+          <h2 className="title-serif text-3xl sm:text-4xl">个人资料</h2>
           <p className="mt-3 opacity-65">设置你在平台和 UGC 社区中展示的身份</p>
         </div>
 
@@ -145,12 +134,12 @@ export default function ProfilePage() {
             <button onClick={openLogin} className="btn-primary">账号登录</button>
           </div>
         ) : user ? (
-          <form onSubmit={save} className={`rounded-2xl border border-amber-100 p-8 shadow-xl ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+          <form onSubmit={save} className={`rounded-2xl border border-amber-100 p-5 shadow-xl sm:p-8 ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
             <div className="mb-8 flex flex-col items-center">
               <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-amber-100 bg-amber-50 text-4xl font-semibold text-amber-800 shadow-md">
                 {avatar ? <img src={avatar} alt="个人头像" className="h-full w-full object-cover" /> : (nickname.trim().charAt(0) || <i className="fa-solid fa-user" />)}
               </div>
-              <div className="mt-5 flex gap-3">
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
                 <label className="btn-secondary cursor-pointer">
                   <i className="fa-solid fa-camera mr-2" />{processingImage ? '处理中…' : '更换头像'}
                   <input type="file" accept="image/png,image/jpeg,image/webp" disabled={processingImage} onChange={selectAvatar} className="hidden" />

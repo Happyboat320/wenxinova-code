@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
 import { AuthContext } from "@/contexts/authContext";
+import SiteHeader from "@/components/SiteHeader";
 
 const coverOrbits = [
     {
@@ -172,23 +173,20 @@ export default function Home() {
     };
 
     return (
-        <div ref={appRef} className={`home-orbit-page h-screen min-w-[1440px] ${isDark ? "text-gray-100" : "text-gray-800"}`}>
+        <div ref={appRef} className={`home-orbit-page h-screen ${isDark ? "text-gray-100" : "text-gray-800"}`}>
             <HomeBackground />
-            <header className="home-site-header home-foreground fixed top-0 left-0 right-0 p-6 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                    <i className="fa-solid fa-book-open text-amber-800 text-2xl" />
-                    <h1 className="text-2xl title-serif">文心新述</h1>
-                </div>
-                {isAuthenticated ? <div className="flex items-center gap-4">
+            <SiteHeader
+                className="home-site-header home-foreground fixed left-0 right-0 top-0 p-6"
+                beforeNavigation={isAuthenticated ? <div className="flex items-center gap-2 sm:gap-4">
                     <button type="button" onClick={() => navigate('/profile')} className="flex items-center gap-3 rounded-full px-2 py-1 transition hover:bg-amber-50" aria-label="编辑个人资料">
                         <span className="w-9 h-9 overflow-hidden rounded-full bg-amber-200 flex items-center justify-center text-amber-800">
                             {user?.avatar ? <img src={user.avatar} alt="" className="h-full w-full object-cover" /> : (user?.nickname?.charAt(0) || <i className="fa-solid fa-user" />)}
                         </span>
                         <span className="max-w-32 truncate text-sm opacity-70">{user?.nickname || '未设置昵称'}</span>
                     </button>
-                    <button onClick={logout} className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors">退出</button>
-                </div> : <button onClick={openLogin} className="px-4 py-2 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-colors">登录</button>}
-            </header>
+                    <button onClick={logout} className="rounded-lg bg-gray-200 px-4 py-2 text-gray-800 transition-colors hover:bg-gray-300">退出</button>
+                </div> : <button onClick={openLogin} className="min-h-11 rounded-lg border border-amber-300 bg-amber-100 px-4 py-2 text-amber-900 transition-colors hover:bg-amber-200">登录</button>}
+            />
 
             <section className="home-scroll-section home-hero-section">
                 <motion.div className="home-foreground home-hero-panel w-full max-w-6xl text-center" initial="hidden" animate="visible" variants={containerVariants}>
@@ -234,7 +232,7 @@ export default function Home() {
                         <h2 className="title-serif">四大核心功能</h2>
                         <span>从典籍阅读，到灵感创作，再到作品沉淀</span>
                     </motion.div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     {cards.map((card) => <motion.div
                         key={card.path}
                         className="book-card home-function-card relative flex overflow-hidden group"

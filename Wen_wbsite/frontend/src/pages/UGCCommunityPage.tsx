@@ -1,9 +1,9 @@
 import { useContext, useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
 import MarkdownContent from '@/components/MarkdownContent';
 import * as api from '@/api';
+import SiteHeader from '@/components/SiteHeader';
 import { AuthContext } from '@/contexts/authContext';
 
 const UGCCommunityPage = () => {
@@ -148,29 +148,17 @@ const UGCCommunityPage = () => {
   };
 
   return (
-    <div className={`min-h-screen p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
-      <header className="mb-12 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <i className="fa-solid fa-book-open text-2xl text-amber-800" />
-          <h1 className="title-serif text-2xl">文心新述</h1>
-        </div>
-        <nav className="flex gap-6">
-          <Link to="/" className="hover:text-amber-700">首页</Link>
-          <Link to="/classical-library" className="hover:text-amber-700">古典文库</Link>
-          <Link to="/digital-coplay" className="hover:text-amber-700">数字共演</Link>
-          <Link to="/ugc-community" className="border-b-2 border-amber-800 pb-1 font-medium text-amber-800">UGC社区</Link>
-          <Link to="/my-collection" className="hover:text-amber-700">我的创作</Link>
-        </nav>
-      </header>
+    <div className={`min-h-screen px-4 py-5 sm:p-8 ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-[#F9F6F0] text-gray-800'}`}>
+      <SiteHeader className="mb-8 sm:mb-12" />
 
       <main className="mx-auto max-w-6xl">
         <div className="mb-8 text-center">
-          <h2 className="title-serif mb-4 text-4xl">灵盛广场</h2>
+          <h2 className="title-serif mb-4 text-3xl sm:text-4xl">灵盛广场</h2>
           <p className="text-lg opacity-80">按创作类型浏览用户发布的 AI 作品</p>
           <p className="mt-2 text-sm opacity-60">当前分类共 {totalCount.toLocaleString()} 篇</p>
         </div>
 
-        <form onSubmit={submitSearch} className={`mx-auto mb-6 flex max-w-3xl gap-3 rounded-xl border border-amber-200 p-4 shadow-sm ${isDark ? 'bg-gray-800' : 'bg-white'}`} role="search">
+        <form onSubmit={submitSearch} className={`mx-auto mb-6 flex max-w-3xl flex-col gap-3 rounded-xl border border-amber-200 p-4 shadow-sm sm:flex-row ${isDark ? 'bg-gray-800' : 'bg-white'}`} role="search">
           <label htmlFor="community-search" className="sr-only">检索用户名、源篇目名或改编全文</label>
           <div className="relative min-w-0 flex-1">
             <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-amber-700" />
@@ -225,7 +213,7 @@ const UGCCommunityPage = () => {
                 <button
                   key={creation.id}
                   onClick={() => openDetail(creation.id)}
-                  className={`rounded-xl border border-amber-100 p-6 text-left shadow-md transition hover:shadow-lg ${isDark ? 'bg-gray-800' : 'bg-white'}`}
+                  className={`rounded-xl border border-amber-100 p-4 text-left shadow-md transition hover:shadow-lg sm:p-6 ${isDark ? 'bg-gray-800' : 'bg-white'}`}
                 >
                   <div className="mb-3 flex justify-between gap-4">
                     <div>
@@ -235,7 +223,7 @@ const UGCCommunityPage = () => {
                     <span className="text-xs opacity-60">{new Date(creation.publishedAt || creation.createdAt).toLocaleDateString('zh-CN')}</span>
                   </div>
                   <p className="mb-5 line-clamp-3">{creation.prompt}</p>
-                  <div className="flex items-center justify-between gap-4 text-sm opacity-70">
+                  <div className="flex flex-col gap-3 text-sm opacity-70 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-amber-100 text-xs text-amber-800">
                         {creation.user.avatar ? <img src={creation.user.avatar} alt="" className="h-full w-full object-cover" /> : (displayName.charAt(0) || <i className="fa-solid fa-user" />)}
@@ -269,8 +257,8 @@ const UGCCommunityPage = () => {
       </main>
 
       {(detail || detailLoading || detailError) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={closeDetail}>
-          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-8 text-gray-800 shadow-2xl" onClick={event => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-6" onClick={closeDetail}>
+          <div className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-white p-4 text-gray-800 shadow-2xl sm:max-h-[85vh] sm:rounded-2xl sm:p-8" onClick={event => event.stopPropagation()}>
             {detailLoading ? <div className="py-16 text-center">加载中...</div> : detailError ? (
               <div className="py-12 text-center">
                 <i className="fa-solid fa-circle-exclamation text-3xl text-red-500" />
@@ -279,7 +267,7 @@ const UGCCommunityPage = () => {
               </div>
             ) : detail && (
               <>
-                <div className="mb-5 flex justify-between gap-4">
+                <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
                     <span className="mb-2 inline-block rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-800">{categoryLabel(detail.category)}</span>
                     <h3 className="text-2xl font-bold">{detail.book?.title || '自由创作'}</h3>
@@ -297,7 +285,7 @@ const UGCCommunityPage = () => {
                 <MarkdownContent content={detail.content} />
 
                 <div className="mt-8 border-t border-amber-100 pt-6">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
                       onClick={toggleLike}
