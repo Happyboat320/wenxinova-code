@@ -202,6 +202,18 @@ export interface CoPlayMessage {
   createdAt: string;
 }
 
+export interface CharacterChatMessage {
+  role: 'user' | 'character';
+  characterName: string | null;
+  content: string;
+  createdAt: string;
+}
+
+export interface JinlingParticipationOption {
+  playerLine: string;
+  replies: Array<{ characterName: '林黛玉' | '贾宝玉'; content: string }>;
+}
+
 export interface CoPlaySession {
   id: number;
   userId: number;
@@ -243,13 +255,13 @@ export interface CreationDetail extends CommunityCreation {
 }
 
 export async function getBookList(page = 1, category?: string, query?: string): Promise<{
-  list: { id: number; title: string; author: string; category: string | null; description: string | null; summary: string | null }[];
+  list: { id: number; title: string; author: string; category: string | null; description: string | null; summary: string | null; image: string | null }[];
   totalPages: number;
   currentPage: number;
   totalCount: number;
 }> {
   const response = await client.get<ApiResponse<{
-    list: { id: number; title: string; author: string; category: string | null; description: string | null; summary: string | null }[];
+    list: { id: number; title: string; author: string; category: string | null; description: string | null; summary: string | null; image: string | null }[];
     totalPages: number;
     currentPage: number;
     totalCount: number;
@@ -492,6 +504,33 @@ export async function addFavoriteCharacter(data: {
 
 export async function removeFavoriteCharacter(id: number): Promise<void> {
   await client.delete(`/co-play/favorites/${id}`);
+}
+
+export async function updateFavoriteCharacter(id: number, data: {
+  description?: string | null;
+  deeds?: string | null;
+}): Promise<FavoriteCharacter> {
+  const response = await client.patch<ApiResponse<FavoriteCharacter>>(`/co-play/favorites/${id}`, data);
+  return unwrap(response.data, '更新角色属性失败');
+}
+
+export async function chatWithFavoriteCharacter(id: number, data: {
+  message: string;
+  history: Array<Pick<CharacterChatMessage, 'role' | 'content'>>;
+}): Promise<CharacterChatMessage> {
+  const response = await client.post<ApiResponse<CharacterChatMessage>>(`/co-play/favorites/${id}/chat`, data);
+  return unwrap(response.data, '角色对话失败');
+}
+
+export async function generateJinlingParticipationOptions(data: {
+  favoriteCharacterId: number;
+  context: Array<{ role: 'character' | 'system'; characterName: string | null; content: string }>;
+}): Promise<{ character: { id: number; name: string }; options: JinlingParticipationOption[] }> {
+  const response = await client.post<ApiResponse<{ character: { id: number; name: string }; options: JinlingParticipationOption[] }>>(
+    '/co-play/jinling-letter/participation-options',
+    data,
+  );
+  return unwrap(response.data, '生成参与发言失败');
 }
 
 export async function getCoPlaySessions(): Promise<CoPlaySession[]> {

@@ -22,14 +22,20 @@ export function isSearchQueryTooLong(query?: string): boolean {
   return Boolean(query && Array.from(query).length > 100);
 }
 
-export function searchLibraryIds(query: string, page: number, pageSize: number, category?: string) {
+export function searchLibraryIds(
+  query: string,
+  page: number,
+  pageSize: number,
+  categoryFilter: { category?: string | string[]; categoryNot?: string | string[] } = {},
+) {
   return searchDocumentIds({
     index: LIBRARY_INDEX,
     query,
     fields: ['title', 'author', 'summary'],
     offset: (page - 1) * pageSize,
     limit: pageSize,
-    category,
+    category: categoryFilter.category,
+    categoryNot: categoryFilter.categoryNot,
   });
 }
 

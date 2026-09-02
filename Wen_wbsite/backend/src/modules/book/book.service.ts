@@ -1,19 +1,132 @@
 import prisma from '../../lib/prisma.js';
 import * as deepseek from '../../lib/deepseek.js';
+import { EXACT_COVER_TITLE_ORDER, getGeneralLibraryCover, getTitleCover } from '../../lib/book-covers.js';
 import { searchLibraryIds } from '../search/search.service.js';
+import type { Prisma } from '@prisma/client';
 
 export const UNCATEGORIZED_VALUE = '__uncategorized__';
+export const NOTE_STYLE_CATEGORY = '笔记小说';
+export const DISPLAY_CATEGORIES = [
+  NOTE_STYLE_CATEGORY,
+  '神怪小说',
+  '唐宋传奇',
+  '明清传奇',
+  '拟话本',
+  '话本',
+  '世情小说',
+  '公案小说',
+  '历史演义',
+] as const;
+
+const displayCategorySources: Record<string, string[]> = {
+  神怪小说: ['神怪小说'],
+  唐宋传奇: ['传奇'],
+  明清传奇: ['明清传奇'],
+  拟话本: ['拟话本'],
+  话本: ['话本'],
+  世情小说: ['世情小说'],
+  公案小说: ['公案小说'],
+  历史演义: ['历史演义', '历史演演义'],
+};
+
+const nonNoteSourceCategories = Object.values(displayCategorySources).flat();
+const FEATURED_TITLE_RANK = new Map<string, number>(
+  EXACT_COVER_TITLE_ORDER.map((title, index) => [title, index]),
+);
+const BOOK_LIST_PAGE_SIZE = 9;
+
+// 兼容历史导入数据：部分记录把换行保存成字面量“\\n”，读取时统一还原为真正换行。
+function normalizeBookText(text: string): string {
+  return text.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+type BookListItem = {
+  id: number;
+  title: string;
+  author: string;
+  category: string | null;
+  description: string | null;
+  summary: string | null;
+  image: string | null;
+};
+
+function categoryLabel(category: string | null): string | null {
+  if (!category) return NOTE_STYLE_CATEGORY;
+  for (const [label, sources] of Object.entries(displayCategorySources)) {
+    if (sources.includes(category)) return label;
+  }
+  return NOTE_STYLE_CATEGORY;
+}
+
+function normalizeCategoryFilter(category?: string): Prisma.BookWhereInput {
+  if (!category) return {};
+  if (category === NOTE_STYLE_CATEGORY || category === UNCATEGORIZED_VALUE) {
+    return {
+      OR: [
+        { category: null },
+        { category: { notIn: nonNoteSourceCategories } },
+      ],
+    };
+  }
+  const sourceCategories = displayCategorySources[category];
+  if (!sourceCategories) return {};
+  return sourceCategories.length === 1 ? { category: sourceCategories[0] } : { category: { in: sourceCategories } };
+}
+
+function combineWhere(...clauses: Prisma.BookWhereInput[]): Prisma.BookWhereInput {
+  const activeClauses = clauses.filter(clause => Object.keys(clause).length > 0);
+  if (activeClauses.length === 0) return {};
+  if (activeClauses.length === 1) return activeClauses[0];
+  return { AND: activeClauses };
+}
+
+function sortFeaturedBooks<T extends { id: number; title: string }>(books: T[]): T[] {
+  return [...books].sort((left, right) => {
+    const leftRank = FEATURED_TITLE_RANK.get(left.title) ?? Number.MAX_SAFE_INTEGER;
+    const rightRank = FEATURED_TITLE_RANK.get(right.title) ?? Number.MAX_SAFE_INTEGER;
+    return leftRank - rightRank || right.id - left.id;
+  });
+}
+
+function selectFeaturedBooks<T extends { id: number; title: string }>(books: T[]): T[] {
+  const seenTitles = new Set<string>();
+  return sortFeaturedBooks(books)
+    .filter(book => FEATURED_TITLE_RANK.has(book.title))
+    .filter(book => {
+      if (seenTitles.has(book.title)) return false;
+      seenTitles.add(book.title);
+      return true;
+    });
+}
+
+function normalizeSearchCategoryFilter(category?: string): { category?: string | string[]; categoryNot?: string[] } {
+  if (!category) return {};
+  if (category === NOTE_STYLE_CATEGORY || category === UNCATEGORIZED_VALUE) {
+    return { categoryNot: nonNoteSourceCategories };
+  }
+  const sourceCategories = displayCategorySources[category];
+  return sourceCategories ? { category: sourceCategories } : {};
+}
+
+function presentBookCategory<T extends { category: string | null; title?: string; image?: string | null }>(book: T, coverIndex?: number): T {
+  const titleCover = book.title ? getTitleCover(book.title) : null;
+  return {
+    ...book,
+    category: categoryLabel(book.category),
+    ...(book.title && 'image' in book ? {
+      image: titleCover || getGeneralLibraryCover(coverIndex ?? 0),
+    } : {}),
+  };
+}
 
 // 获取书籍列表；分类条件必须同时用于列表和总数，保证分页统计一致。
 export async function getBookList(page: number = 1, category?: string, query?: string) {
-  const pageSize = 9;
+  const pageSize = BOOK_LIST_PAGE_SIZE;
   const skip = (page - 1) * pageSize;
-  const where = category === UNCATEGORIZED_VALUE
-    ? { category: null }
-    : category ? { category } : {};
+  const where = normalizeCategoryFilter(category);
 
   if (query) {
-    const searchResult = await searchLibraryIds(query, page, pageSize, category);
+    const searchResult = await searchLibraryIds(query, page, pageSize, normalizeSearchCategoryFilter(category));
     if (searchResult.ids.length === 0) {
       return { list: [], totalPages: Math.ceil(searchResult.total / pageSize), currentPage: page, totalCount: searchResult.total };
     }
@@ -26,19 +139,24 @@ export async function getBookList(page: number = 1, category?: string, query?: s
         category: true,
         description: true,
         summary: true,
+        image: true,
       },
     });
     const byId = new Map(matches.map(book => [book.id, book]));
     return {
       // Prisma 的 IN 查询不保证顺序，按 Manticore 相关度顺序重新排列。
-      list: searchResult.ids.map(id => byId.get(id)).filter((book): book is NonNullable<typeof book> => Boolean(book)),
+      list: searchResult.ids
+        .map(id => byId.get(id))
+        .filter((book): book is NonNullable<typeof book> => Boolean(book))
+        .map((book, index) => presentBookCategory(book, index)),
       totalPages: Math.ceil(searchResult.total / pageSize),
       currentPage: page,
       totalCount: searchResult.total,
     };
   }
 
-  const [books, total] = await Promise.all([
+  const featuredWhere = combineWhere(where, { title: { in: [...EXACT_COVER_TITLE_ORDER] } });
+  const [featuredMatches, total] = await Promise.all([
     prisma.book.findMany({
       select: {
         id: true,
@@ -47,20 +165,47 @@ export async function getBookList(page: number = 1, category?: string, query?: s
         category: true,
         description: true,
         summary: true,
+        image: true,
       },
-      where,
-      // 新导入作品优先展示，避免新增整本作品沉到两万余条旧数据之后。
       orderBy: { id: 'desc' },
-      skip,
-      take: pageSize,
+      where: featuredWhere,
     }),
     prisma.book.count({ where }),
   ]);
 
+  const featuredBooks = selectFeaturedBooks(featuredMatches);
+  const featuredIds = featuredBooks.map(book => book.id);
+  const books: BookListItem[] = featuredBooks.slice(skip, skip + pageSize);
+
+  if (books.length < pageSize) {
+    const regularSkip = Math.max(skip - featuredBooks.length, 0);
+    const regularWhere = combineWhere(
+      where,
+      featuredIds.length > 0 ? { id: { notIn: featuredIds } } : {},
+    );
+    const regularBooks = await prisma.book.findMany({
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        category: true,
+        description: true,
+        summary: true,
+        image: true,
+      },
+      where: regularWhere,
+      // 非专属封面作品仍按新导入优先，避免新增整本作品沉到两万余条旧数据之后。
+      orderBy: { id: 'desc' },
+      skip: regularSkip,
+      take: pageSize - books.length,
+    });
+    books.push(...regularBooks);
+  }
+
   const totalPages = Math.ceil(total / pageSize);
 
   return {
-    list: books,
+    list: books.map((book, index) => presentBookCategory(book, index)),
     totalPages,
     currentPage: page,
     totalCount: total,
@@ -116,7 +261,7 @@ export async function getBookContent(id: number, chapterId?: number) {
   return {
     title: book.title,
     author: book.author,
-    content: activeChapter?.originalText || book.originalText || '',
+    content: normalizeBookText(activeChapter?.originalText || book.originalText || ''),
     chapter: activeChapter ? {
       id: activeChapter.id,
       order: activeChapter.order,
@@ -135,24 +280,23 @@ export async function getBookContent(id: number, chapterId?: number) {
   };
 }
 
-// 分类完全取自数据库实际值；空值作为“未分类”返回，不维护易失真的硬编码名单。
+// 分类取自数据库实际值，并按产品口径合并为八个固定展示类。
 export async function getBookCategories() {
   const groups = await prisma.book.groupBy({
     by: ['category'],
     _count: { _all: true },
   });
 
-  return groups
-    // 使用 _all 才能让 category 为空的“未分类”也按真实数量参与排序。
-    .sort((left, right) => (
-      right._count._all - left._count._all
-      || (left.category || '未分类').localeCompare(right.category || '未分类', 'zh-CN')
-    ))
-    .map(group => ({
-      value: group.category || UNCATEGORIZED_VALUE,
-      label: group.category || '未分类',
-      count: group._count._all,
-    }));
+  const mergedGroups = new Map<string, { value: string; label: string; count: number }>(
+    DISPLAY_CATEGORIES.map(category => [category, { value: category, label: category, count: 0 }]),
+  );
+  for (const group of groups) {
+    const label = categoryLabel(group.category) || NOTE_STYLE_CATEGORY;
+    const existing = mergedGroups.get(label);
+    if (existing) existing.count += group._count._all;
+  }
+
+  return DISPLAY_CATEGORIES.map(category => mergedGroups.get(category)!);
 }
 
 // 获取书籍译文；回目译文独立缓存，避免切换回目时串用其他篇章内容。

@@ -4,6 +4,7 @@ const favoriteCharacterMock = vi.hoisted(() => ({
   findMany: vi.fn(),
   findFirst: vi.fn(),
   create: vi.fn(),
+  update: vi.fn(),
   delete: vi.fn(),
 }));
 const bookMock = vi.hoisted(() => ({ findUnique: vi.fn() }));
@@ -41,6 +42,8 @@ vi.mock('../../lib/prisma.js', () => ({
 
 vi.mock('../../lib/deepseek.js', () => ({
   generateCoPlayTurn: vi.fn(),
+  generateFavoriteCharacterReply: vi.fn(),
+  generateJinlingParticipationOptions: vi.fn(),
 }));
 
 vi.mock('../../lib/manticore.js', () => ({
@@ -51,7 +54,8 @@ vi.mock('../search/search.service.js', () => ({
   syncCreationSearchDocument: vi.fn(),
 }));
 
-import { addFavoriteCharacter, createSession, MAX_COPLAY_CHARACTERS, persistSessionCreation } from './co-play.service.js';
+import * as deepseek from '../../lib/deepseek.js';
+import { addFavoriteCharacter, chatWithFavoriteCharacter, createJinlingParticipationOptions, createSession, MAX_COPLAY_CHARACTERS, persistSessionCreation, updateFavoriteCharacter } from './co-play.service.js';
 
 describe('数字共演角色收藏', () => {
   beforeEach(() => {
@@ -82,6 +86,86 @@ describe('数字共演角色收藏', () => {
     const result = await addFavoriteCharacter(2, { bookId: 1, name: '任氏', sourceType: 'ai' });
     expect(result.kind).toBe('exists');
     expect(favoriteCharacterMock.create).not.toHaveBeenCalled();
+  });
+
+  it('更新收藏角色的灵魂与记忆属性', async () => {
+    favoriteCharacterMock.findFirst.mockResolvedValue({ id: 8 });
+    favoriteCharacterMock.update.mockResolvedValue({ id: 8, name: '任氏', description: '重情守义', deeds: '补充记忆' });
+
+    const result = await updateFavoriteCharacter(2, 8, {
+      description: '重情守义',
+      deeds: '补充记忆',
+    });
+
+    expect(result.kind).toBe('updated');
+    expect(favoriteCharacterMock.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data: { description: '重情守义', deeds: '补充记忆' },
+    });
+  });
+
+  it('角色对话使用收藏角色的最新属性', async () => {
+    favoriteCharacterMock.findFirst.mockResolvedValue({
+      id: 8,
+      userId: 2,
+      name: '任氏',
+      description: '重情守义',
+      deeds: '新写入的灵魂与记忆',
+      sourceTitle: '任氏传',
+      sourceChapterTitle: null,
+    });
+    vi.mocked(deepseek.generateFavoriteCharacterReply).mockResolvedValue('愿以本心相告。');
+
+    const result = await chatWithFavoriteCharacter(2, 8, {
+      message: '你如何看待情义？',
+      history: [{ role: 'user', content: '我们聊聊。' }],
+    });
+
+    expect(result.kind).toBe('created');
+    expect(deepseek.generateFavoriteCharacterReply).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '任氏', deeds: '新写入的灵魂与记忆' }),
+      expect.arrayContaining([expect.objectContaining({ content: '我们聊聊。' })]),
+      '你如何看待情义？',
+    );
+  });
+
+  it('黛玉葬花参与候选使用用户收藏角色属性', async () => {
+    favoriteCharacterMock.findFirst.mockResolvedValue({
+      id: 8,
+      userId: 2,
+      name: '任氏',
+      description: '重情守义',
+      deeds: '新写入的灵魂与记忆',
+      sourceTitle: '任氏传',
+      sourceChapterTitle: null,
+    });
+    vi.mocked(deepseek.generateJinlingParticipationOptions).mockResolvedValue([
+      {
+        playerLine: '落花有意，知音不可负。',
+        replies: [
+          { characterName: '林黛玉', content: '你竟也怜这落花。' },
+          { characterName: '贾宝玉', content: '这话说得极是。' },
+        ],
+      },
+      {
+        playerLine: '愿替二位守这一抔净土。',
+        replies: [
+          { characterName: '林黛玉', content: '多谢你这份心。' },
+          { characterName: '贾宝玉', content: '我也来一同守着。' },
+        ],
+      },
+    ]);
+
+    const result = await createJinlingParticipationOptions(2, {
+      favoriteCharacterId: 8,
+      context: [{ role: 'character', characterName: '林黛玉', content: '花谢花飞花满天。' }],
+    });
+
+    expect(result.kind).toBe('created');
+    expect(deepseek.generateJinlingParticipationOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '任氏', deeds: '新写入的灵魂与记忆' }),
+      [expect.objectContaining({ characterName: '林黛玉', content: '花谢花飞花满天。' })],
+    );
   });
 });
 

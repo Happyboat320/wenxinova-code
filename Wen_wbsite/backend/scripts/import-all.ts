@@ -15,6 +15,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as XLSX from 'xlsx';
+import { resolveBookCover } from '../src/lib/book-covers';
 
 const prisma = new PrismaClient();
 const BACKEND_DIR = path.resolve(__dirname, '..');
@@ -25,7 +26,6 @@ const DOCUMENT_DIR = path.join(BACKEND_DIR, 'data', 'doc');
 const DOCUMENT_EXPECTED_COUNT = 523;
 const JSON_THEME = '新导入';
 const DOCUMENT_THEME_PREFIX = '文档导入：';
-const DEFAULT_IMAGE = 'https://img.zcool.cn/community/01e3c85e1f6f5da80120a8957c7227.jpg';
 const FOOTNOTE_REGEX = /\\?\[\d+\]/g;
 
 interface JsonSourceRow {
@@ -111,7 +111,8 @@ type JsonBookRecord = Prisma.BookGetPayload<{ select: typeof jsonBookSelect }>;
 type BookWriteData = Omit<JsonBookRecord, 'id'>;
 
 function normalizeNewlines(value: string): string {
-  return value.replace(/\r\n/g, '\n');
+  // 兼容 JSON/文本中被转义保存的换行符。
+  return value.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
 function stripFootnotes(value: string): string {
@@ -152,7 +153,13 @@ function transformJsonRow(row: JsonSourceRow): BookWriteData {
     author: row.来源 || '未知作者',
     dynasty: row.朝代 || '未知',
     description: summary.length > 200 ? `${summary.slice(0, 197)}...` : summary,
-    image: DEFAULT_IMAGE,
+    image: resolveBookCover({
+      title: row.题目 || '未命名',
+      category: row.体裁 || '笔记小说',
+      theme: JSON_THEME,
+      summary,
+      keywords: row.关键词 ? row.关键词.join(', ') : '',
+    }),
     category: row.体裁 || '笔记小说',
     theme: JSON_THEME,
     keywords: row.关键词 ? row.关键词.join(', ') : '',
@@ -185,7 +192,14 @@ function transformExcelRow(row: ExcelSourceRow) {
     annotationCount: parseAnnotationCount(row.注释数目),
     description,
     summary,
-    image: DEFAULT_IMAGE,
+    image: resolveBookCover({
+      title,
+      category: nullable(cleanSingleLine(row.题材体裁 || row.类别)),
+      theme: nullable(cleanSingleLine(row.主题)),
+      description,
+      summary,
+      keywords: nullable(cleanSingleLine(row.关键词)),
+    }),
     characterNames: cleanSingleLine(row.人物)
       .split(/[；;，,、]/)
       .map((name) => name.trim())
@@ -236,6 +250,8 @@ function transformDocumentRow(row: DocumentSourceRow, sourceFile: string): Parse
   const annotations = parseDocumentAnnotations(row.注释);
   const originalText = intro ? `【入话】\n${intro}\n\n【正文】\n${text}` : text;
   const completeSummary = variants ? `${summary}${summary ? '\n\n' : ''}【异说】\n${variants}` : summary;
+  const category = nullable(cleanSingleLine(row.题材体裁));
+  const theme = `${DOCUMENT_THEME_PREFIX}${documentCollection(sourceFile)}`;
 
   return {
     sourceFile,
@@ -244,9 +260,16 @@ function transformDocumentRow(row: DocumentSourceRow, sourceFile: string): Parse
       author: cleanSingleLine(row.来源) || '未知作者',
       dynasty: nullable(cleanSingleLine(row.朝代)),
       description: nullable(summary.replace(/\s+/g, ' ').slice(0, 200)),
-      image: DEFAULT_IMAGE,
-      category: nullable(cleanSingleLine(row.题材体裁)),
-      theme: `${DOCUMENT_THEME_PREFIX}${documentCollection(sourceFile)}`,
+      image: resolveBookCover({
+        title,
+        category,
+        theme,
+        description: nullable(summary.replace(/\s+/g, ' ').slice(0, 200)),
+        summary: completeSummary,
+        keywords: Array.isArray(row.关键词) ? row.关键词.map((value) => cleanSingleLine(value)).filter(Boolean).join(', ') : '',
+      }),
+      category,
+      theme,
       keywords: nullable(Array.isArray(row.关键词) ? row.关键词.map((value) => cleanSingleLine(value)).filter(Boolean).join(', ') : ''),
       annotationCount: annotations.length,
       originalText,

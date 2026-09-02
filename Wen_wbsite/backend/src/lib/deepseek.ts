@@ -30,7 +30,31 @@ interface DeepSeekCallOptions {
   response_format?: { type: 'json_object' };
 }
 
+const MAX_API_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 300;
+const RETRYABLE_ERROR_MESSAGE = '服务暂时繁忙，请稍后再试';
+
 function getMockResponse(prompt: string): string {
+  if (prompt.includes('黛玉葬花参与') && prompt.includes('options')) {
+    return JSON.stringify({
+      options: [
+        {
+          playerLine: '二位且慢伤怀，落花虽去，情意尚可托于一抔净土。',
+          replies: [
+            { characterName: '林黛玉', content: '你也知落花不该委于浊流，倒算听懂了我这点痴意。' },
+            { characterName: '贾宝玉', content: '这话正合我心，妹妹的花冢又添一位知音。' },
+          ],
+        },
+        {
+          playerLine: '若花有灵，想来也愿有人记得它盛放时的颜色。',
+          replies: [
+            { characterName: '林黛玉', content: '记得又如何，明年花发，旧人旧事未必仍在。' },
+            { characterName: '贾宝玉', content: '既如此，我便日日记着，连同今日这句话一并不忘。' },
+          ],
+        },
+      ],
+    });
+  }
   if (prompt.includes('角色分析') && prompt.includes('characters')) {
     return JSON.stringify({
       characters: [
@@ -81,7 +105,9 @@ async function callDeepSeekAPI(
   }
 
   if (!DEEPSEEK_API_KEY) {
-    throw new Error('未配置 DEEPSEEK_API_KEY');
+    // 不把服务配置细节暴露给用户，统一使用友好的稍后再试提示。
+    console.error('DeepSeek 请求未配置 DEEPSEEK_API_KEY');
+    throw new Error(RETRYABLE_ERROR_MESSAGE);
   }
 
   const requestBody: Record<string, unknown> = {
@@ -94,35 +120,43 @@ async function callDeepSeekAPI(
   // DeepSeek JSON Output 需要 response_format 和提示词同时约束，后续仍做结构校验。
   if (options.response_format) requestBody.response_format = options.response_format;
 
-  const response = await fetch(DEEPSEEK_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-    },
-    body: JSON.stringify(requestBody),
-    signal: options.signal,
-  });
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_API_RETRIES; attempt += 1) {
+    try {
+      const response = await fetch(DEEPSEEK_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: options.signal,
+      });
 
-  const responseText = await response.text();
-  let data: DeepSeekResponse;
-
-  try {
-    data = JSON.parse(responseText) as DeepSeekResponse;
-  } catch {
-    throw new Error(`DeepSeek API 返回了无效响应（HTTP ${response.status}）`);
+      const responseText = await response.text();
+      let data: DeepSeekResponse;
+      try {
+        data = JSON.parse(responseText) as DeepSeekResponse;
+      } catch {
+        throw new Error(`DeepSeek API 返回了无效响应（HTTP ${response.status}）`);
+      }
+      if (!response.ok) {
+        throw new Error(`DeepSeek API 调用失败（HTTP ${response.status}）：${data.error?.message || '未知错误'}`);
+      }
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (!content) throw new Error('DeepSeek API 返回结果为空');
+      return content;
+    } catch (caught) {
+      lastError = caught;
+      // 请求被主动取消时无需重试，避免客户端断开后继续消耗 API 配额。
+      if (options.signal?.aborted || attempt >= MAX_API_RETRIES) break;
+      const delay = RETRY_BASE_DELAY_MS * 2 ** attempt;
+      console.warn(`DeepSeek 请求第 ${attempt + 1} 次失败，将在 ${delay}ms 后重试`);
+      await new Promise<void>(resolve => setTimeout(resolve, delay));
+    }
   }
-
-  if (!response.ok) {
-    throw new Error(`DeepSeek API 调用失败（HTTP ${response.status}）：${data.error?.message || '未知错误'}`);
-  }
-
-  const content = data.choices?.[0]?.message?.content?.trim();
-  if (!content) {
-    throw new Error('DeepSeek API 返回结果为空');
-  }
-
-  return content;
+  console.error('DeepSeek 请求最终失败:', lastError);
+  throw new Error(RETRYABLE_ERROR_MESSAGE);
 }
 
 function buildMessages(system: string, user: string): AIMessage[] {
@@ -483,6 +517,11 @@ export interface CoPlayTurnMessage {
   content: string;
 }
 
+export interface JinlingParticipationOption {
+  playerLine: string;
+  replies: Array<{ characterName: '林黛玉' | '贾宝玉'; content: string }>;
+}
+
 function parseCoPlayMessages(raw: string, expectedNames: string[]): CoPlayTurnMessage[] {
   const normalized = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   const value = JSON.parse(normalized) as { messages?: Array<{ characterName?: unknown; content?: unknown }> };
@@ -535,4 +574,103 @@ ${history.length ? history.map(message => `${message.role === 'user' ? '用户' 
     { role: 'user', content: prompt },
   ], { temperature: 0.75, max_tokens: Math.min(4000, 800 + characters.length * 320) });
   return parseCoPlayMessages(raw, expectedNames);
+}
+
+export async function generateFavoriteCharacterReply(
+  character: CoPlayCharacterPrompt,
+  history: CoPlayHistoryMessage[],
+  userMessage: string,
+): Promise<string> {
+  if (AI_MOCK_MODE) {
+    return `我是${character.name}。你方才所问，我会依照自己的经历与性情回应：${userMessage.slice(0, 80)}`;
+  }
+
+  const prompt = `你现在只扮演一个剧本杀收藏角色，与用户进行一对一对话。
+
+角色名字：${character.name}
+来源文本：${character.sourceTitle || '未知文本'}
+人物属性：${character.description || '无'}
+灵魂与记忆：${character.deeds || '无'}
+
+近期对话：
+${history.length ? history.map(message => `${message.role === 'user' ? '用户' : character.name}：${message.content}`).join('\n') : '尚未开始'}
+
+用户最新消息：${userMessage}
+
+请只以【${character.name}】的身份回答。回答必须贴合人物属性、灵魂与记忆、来源文本语气和经历；不要跳出角色，不要解释你是 AI，不要替用户发言。`;
+
+  return callDeepSeekAPI([
+    { role: 'system', content: '你是古典文学剧本杀角色扮演引擎，必须严格保持角色人设、记忆、语气和行动动机一致。' },
+    { role: 'user', content: prompt },
+  ], { temperature: 0.78, max_tokens: 1200 });
+}
+
+function parseJinlingParticipationOptions(raw: string): JinlingParticipationOption[] {
+  const value = parseJsonObject(raw) as { options?: unknown };
+  if (!Array.isArray(value.options)) throw new Error('黛玉葬花参与返回缺少 options');
+  const expected = new Set(['林黛玉', '贾宝玉']);
+  const options = value.options.map(item => {
+    const row = item as { playerLine?: unknown; replies?: unknown };
+    const replies = Array.isArray(row.replies)
+      ? row.replies.map(reply => {
+          const next = reply as { characterName?: unknown; content?: unknown };
+          return {
+            characterName: cleanString(next.characterName, 20),
+            content: cleanString(next.content, 180),
+          };
+        }).filter(reply => expected.has(reply.characterName) && reply.content)
+      : [];
+    return {
+      playerLine: cleanString(row.playerLine, 180),
+      replies,
+    };
+  }).filter(option => option.playerLine && option.replies.length === 2).slice(0, 2);
+
+  if (options.length !== 2) throw new Error('黛玉葬花参与候选数量不完整');
+  return options.map(option => ({
+    playerLine: option.playerLine,
+    replies: option.replies.map(reply => ({
+      characterName: reply.characterName as '林黛玉' | '贾宝玉',
+      content: reply.content,
+    })),
+  }));
+}
+
+export async function generateJinlingParticipationOptions(
+  character: CoPlayCharacterPrompt,
+  context: CoPlayHistoryMessage[],
+): Promise<JinlingParticipationOption[]> {
+  if (AI_MOCK_MODE) {
+    return parseJinlingParticipationOptions(getMockResponse('黛玉葬花参与 options'));
+  }
+
+  const prompt = `黛玉葬花参与生成任务。用户将以一个收藏角色插入《红楼梦》“潇湘馆・黛玉葬花”的宝黛对话。
+
+参与角色：
+名字：${character.name}
+来源文本：${character.sourceTitle || '未知文本'}
+人物属性：${character.description || '无'}
+灵魂与记忆：${character.deeds || '无'}
+
+当前剧情上下文：
+${context.length ? context.map(message => `${message.characterName || '旁白'}：${message.content}`).join('\n') : '剧情刚开始'}
+
+请生成两个可供用户选择的参与角色发言候选，并为每个候选生成林黛玉和贾宝玉的即时回应。
+要求：
+1. playerLine 必须严格符合参与角色的人物属性、经历和语言气质。
+2. 黛玉、宝玉的回应必须围绕 playerLine 改写，不沿用原固定台词。
+3. 宝黛回应要贴合“黛玉葬花”的情境、二人关系和各自语气。
+4. 不要让参与角色替黛玉或宝玉作决定；不要跳出现代说明。
+5. 每句不超过 80 个汉字。
+
+只输出合法 JSON，不使用 Markdown。格式：
+{"options":[{"playerLine":"参与角色发言","replies":[{"characterName":"林黛玉","content":"黛玉回应"},{"characterName":"贾宝玉","content":"宝玉回应"}]}]}`;
+
+  return callStructuredJson([
+    { role: 'system', content: '你是古典文学互动剧情导演，擅长让外部角色自然插入红楼梦场景，并保持所有人物语气一致。输出必须是机器可解析 JSON。' },
+    { role: 'user', content: prompt },
+  ], parseJinlingParticipationOptions, '黛玉葬花参与', {
+    temperature: 0.78,
+    max_tokens: 1600,
+  });
 }

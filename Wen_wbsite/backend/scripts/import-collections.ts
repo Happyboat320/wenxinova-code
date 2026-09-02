@@ -8,12 +8,12 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveBookCover } from '../src/lib/book-covers';
 
 const prisma = new PrismaClient();
 const BACKEND_DIR = path.resolve(__dirname, '..');
 const COLLECTION_DIR = path.join(BACKEND_DIR, 'data', 'collections');
 const COLLECTION_THEME = '整本导入';
-const DEFAULT_IMAGE = 'https://img.zcool.cn/community/01e3c85e1f6f5da80120a8957c7227.jpg';
 
 interface SourceRow {
   题目?: string;
@@ -35,9 +35,8 @@ interface CollectionDefinition {
 }
 
 const BASE_COLLECTIONS: CollectionDefinition[] = [
-  // 归入书库已有“传奇”分类，避免与同义的“明清传奇”拆成两个筛选项。
-  { file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 50 },
-  { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '传奇', unit: '出/篇', expectedCount: 53 },
+  { file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清', category: '明清传奇', unit: '出/篇', expectedCount: 50 },
+  { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '明清传奇', unit: '出/篇', expectedCount: 53 },
   { file: '金瓶梅.json', title: '金瓶梅', author: '兰陵笑笑生（疑）', dynasty: '明代', category: '世情小说', unit: '回', expectedCount: 100 },
   { file: '官场.json', title: '官场现形记', author: '李伯元', dynasty: '晚清', category: '世情小说', unit: '回', expectedCount: 60 },
   { file: '玉娇梨.json', title: '玉娇梨', author: '荑秋散人（一说天花藏主人）', dynasty: '明末清初', category: '世情小说', unit: '回', expectedCount: 20 },
@@ -49,16 +48,16 @@ const BASE_COLLECTIONS: CollectionDefinition[] = [
 const TMP_COLLECTIONS: CollectionDefinition[] = [
   { file: 'tmp/八段锦.json', title: '八段锦', author: '佚名', dynasty: '明末', category: '世情小说', unit: '段/篇', expectedCount: 8 },
   { file: 'tmp/包公演义.json', title: '包公演义', author: '佚名', dynasty: '明', category: '公案小说', unit: '回', expectedCount: 100 },
-  { file: 'tmp/南柯记.json', title: '南柯记', author: '汤显祖', dynasty: '明', category: '传奇', unit: '出/篇', expectedCount: 44 },
+  { file: 'tmp/南柯记.json', title: '南柯记', author: '汤显祖', dynasty: '明', category: '明清传奇', unit: '出/篇', expectedCount: 44 },
   { file: 'tmp/新增才子九云记.json', title: '新增才子九云记', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 31 },
   { file: 'tmp/春秋配.json', title: '春秋配', author: '佚名', dynasty: '清初', category: '世情小说', unit: '回/篇', expectedCount: 16 },
-  { file: 'tmp/牡丹亭.json', title: '牡丹亭', author: '汤显祖', dynasty: '明', category: '传奇', unit: '出/篇', expectedCount: 55 },
+  { file: 'tmp/牡丹亭.json', title: '牡丹亭', author: '汤显祖', dynasty: '明', category: '明清传奇', unit: '出/篇', expectedCount: 55 },
   { file: 'tmp/皇明诸司廉明奇判公案.json', title: '皇明诸司廉明奇判公案', author: '余象斗编刊', dynasty: '明', category: '公案小说', unit: '则/篇', expectedCount: 59 },
-  { file: 'tmp/紫钗记.json', title: '紫钗记', author: '汤显祖', dynasty: '明', category: '传奇', unit: '出/篇', expectedCount: 53 },
+  { file: 'tmp/紫钗记.json', title: '紫钗记', author: '汤显祖', dynasty: '明', category: '明清传奇', unit: '出/篇', expectedCount: 53 },
   { file: 'tmp/蜜蜂计.json', title: '蜜蜂计', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 5 },
   { file: 'tmp/蜜蜂记.json', title: '蜜蜂记', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 5 },
   { file: 'tmp/蝴蝶杯.json', title: '蝴蝶杯', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 10 },
-  { file: 'tmp/邯郸记.json', title: '邯郸记', author: '汤显祖', dynasty: '明', category: '传奇', unit: '出/篇', expectedCount: 30 },
+  { file: 'tmp/邯郸记.json', title: '邯郸记', author: '汤显祖', dynasty: '明', category: '明清传奇', unit: '出/篇', expectedCount: 30 },
   { file: 'tmp/霞笺记.json', title: '霞笺记', author: '佚名', dynasty: '明末清初', category: '世情小说', unit: '回', expectedCount: 11 },
   { file: 'tmp/鸳鸯配.json', title: '鸳鸯配', author: '佚名', dynasty: '清初', category: '世情小说', unit: '回/篇', expectedCount: 12 },
 ].map(definition => ({
@@ -228,7 +227,12 @@ export async function runImport(options: { dryRun: boolean; backup: boolean }): 
         author: definition.author,
         dynasty: definition.dynasty,
         description,
-        image: DEFAULT_IMAGE,
+        image: resolveBookCover({
+          title: definition.title,
+          category: definition.category,
+          description,
+          summary,
+        }),
         category: definition.category,
         theme: COLLECTION_THEME,
         keywords: chapters.map(chapter => chapter.title).join('、'),

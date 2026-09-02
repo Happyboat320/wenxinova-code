@@ -11,6 +11,7 @@ const categoryLabels: Record<api.CreationCategory, string> = {
   script: '剧本杀',
   props: '道具',
   dm: 'DM 手册',
+  coplay: '数字共演',
   other: '其他',
 };
 

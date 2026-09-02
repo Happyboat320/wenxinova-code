@@ -43,6 +43,64 @@ describe('Manticore 检索参数', () => {
     });
   });
 
+  it('向 Manticore 发送多分类过滤', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      hits: { total: { value: 1 }, hits: [{ _id: '11' }] },
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(searchDocumentIds({
+      index: 'wenxin_library',
+      query: '山水',
+      fields: ['title', 'author', 'summary'],
+      category: ['散文', '诗', '散文'],
+      offset: 0,
+      limit: 9,
+    })).resolves.toEqual({ ids: [11], total: 1 });
+
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      query: {
+        bool: {
+          must: [
+            { match: { 'title,author,summary': { query: '山水', operator: 'and' } } },
+            { in: { category: ['散文', '诗'] } },
+          ],
+        },
+      },
+    });
+  });
+
+  it('向 Manticore 发送分类排除过滤', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      hits: { total: { value: 1 }, hits: [{ _id: '12' }] },
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(searchDocumentIds({
+      index: 'wenxin_library',
+      query: '异闻',
+      fields: ['title', 'author', 'summary'],
+      categoryNot: ['神怪小说', '传奇', '传奇'],
+      offset: 0,
+      limit: 9,
+    })).resolves.toEqual({ ids: [12], total: 1 });
+
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      query: {
+        bool: {
+          must: [
+            { match: { 'title,author,summary': { query: '异闻', operator: 'and' } } },
+          ],
+          must_not: [
+            { in: { category: ['神怪小说', '传奇'] } },
+          ],
+        },
+      },
+    });
+  });
+
   it('Manticore 不可用时返回统一的检索服务异常', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connection refused')));
     await expect(searchDocumentIds({

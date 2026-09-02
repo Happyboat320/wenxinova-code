@@ -12,6 +12,7 @@ import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { resolveBookCover } from '../src/lib/book-covers';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +21,6 @@ const prisma = new PrismaClient();
 
 const JSON_PATH = path.join(__dirname, '..', 'data', 'ancient_prose.json');
 const DEFAULT_BOOK_NAME = '新导入';
-const DEFAULT_IMAGE = 'https://img.zcool.cn/community/01e3c85e1f6f5da80120a8957c7227.jpg';
 
 interface ProseEntry {
   题目?: string;
@@ -74,7 +74,7 @@ async function main() {
           keywords,
           category,
           theme,
-          image: DEFAULT_IMAGE,
+          image: resolveBookCover({ title, category, theme, summary, keywords }),
           description: summary.length > 200 ? summary.slice(0, 197) + '...' : summary,
         },
       });

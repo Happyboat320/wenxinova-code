@@ -4,17 +4,53 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
 import { AuthContext } from "@/contexts/authContext";
 
-const coverFiles = [
-    "三言（警世通言 喻世明言 醒世恒言 ）.png", "唐五代笔记小说.png", "明代笔记小说.png",
-    "搜神记.png", "唐五代志怪传奇序录封面.png", "明清传奇.png", "封面.png", "清平山堂话本.png",
-    "汉魏六朝笔记小说.png", "官场现形记.png", "清代笔记小说.png", "宋元笔记小说.png",
-    "孤本小说集.png", "宋元明话本.png", "唐宋传奇.png", "二拍封面.png", "宋元小说话本.png", "唐宋传奇选封面.png"
-];
+const coverOrbits = [
+    {
+        depth: 1,
+        radius: "-45vw",
+        duration: 420,
+        angleOffset: -8,
+        files: [
+            "唐宋传奇集封面 (2).png", "桃花扇3.png", "唐宋传奇.png", "三言封面.png", "二拍封面2.png",
+            "宋元明话本.png", "唐五代笔记小说.png", "封面.png", "明代笔记小说.png", "宋元小说话本.png",
+            "官场现形记.png", "隋唐演义2.png", "临川四梦封面.png", "李渔全集封面.png", "明清传奇.png",
+            "新刻绣像批评金瓶梅封面.png", "金瓶梅封面.png"
+        ]
+    },
+    {
+        depth: 2,
+        radius: "-33vw",
+        duration: 365,
+        angleOffset: 116,
+        reverse: true,
+        files: [
+            "孤本小说集.png", "唐宋传奇集封面.png", "二拍封面.png", "三言封面3.png", "宋元笔记小说.png",
+            "唐五代志怪传奇序录封面.png", "长生殿2.png", "清平山堂话本.png", "太平广记封面.png",
+            "隋唐演义封面.png", "玉娇梨4.png", "长生殿3.png", "长生殿封面.png", "搜神记.png",
+            "三言二拍封面.png", "唐宋传奇总集目录（这本我们可能没有但可以借用封面？）.png"
+        ]
+    },
+    {
+        depth: 3,
+        radius: "-22vw",
+        duration: 315,
+        angleOffset: 238,
+        denseStep: 3,
+        denseLimit: 5,
+        files: [
+            "汉魏六朝笔记小说.png", "隋唐演义3.png", "唐宋传奇选封面.png", "清代笔记小说.png",
+            "官场现形记 (2).png", "金瓶梅2.png", "隋唐演义4.png", "大宋中兴通俗演义封面.png",
+            "桃花扇封面.png", "李渔全集2.png", "三言（警世通言 喻世明言 醒世恒言 ）.png", "桃花扇2.png",
+            "唐五代传奇集封面.png", "玉娇梨2.png", "玉娇梨封面.png", "玉娇梨3.png"
+        ]
+    }
+] as const;
 
-const buildOrbit = (count: number, offset: number) => Array.from(
-    { length: count },
-    (_, index) => coverFiles[(offset + index * 5) % coverFiles.length]
-);
+const buildDenseOrbit = (files: readonly string[], step: number, limit = Infinity) => files.flatMap((file, index, orbitFiles) => {
+    const insertedCount = Math.floor(index / step);
+    if (index % step !== 0 || insertedCount >= limit) return [file];
+    return [file, orbitFiles[(index + Math.ceil(orbitFiles.length / 2)) % orbitFiles.length]];
+});
 
 function CoverOrbit({
     files,
@@ -22,22 +58,37 @@ function CoverOrbit({
     duration,
     depth,
     angleOffset = 0,
-    reverse = false
+    reverse = false,
+    denseStep = 2,
+    denseLimit = Infinity
 }: {
-    files: string[];
+    files: readonly string[];
     radius: string;
     duration: number;
-    depth: 1 | 2 | 3 | 4;
+    depth: 1 | 2 | 3;
     angleOffset?: number;
     reverse?: boolean;
+    denseStep?: number;
+    denseLimit?: number;
 }) {
+    const orbitFiles = buildDenseOrbit(files, denseStep, denseLimit);
+
     return (
         <ul className={`home-cover-orbit depth-${depth}${reverse ? " is-reverse" : ""}`} style={{ "--orbit-duration": `${duration}s` } as CSSProperties}>
-            {files.map((file, index) => (
+            {orbitFiles.map((_, index) => (
+                <li
+                    key={`${depth}-bead-${index}`}
+                    className="home-cover-bead-position"
+                    style={{ "--cover-angle": `${angleOffset + (index + 0.5) * 360 / orbitFiles.length}deg`, "--cover-radius": radius } as CSSProperties}
+                >
+                    <span className="home-orbit-bead" />
+                </li>
+            ))}
+            {orbitFiles.map((file, index) => (
                 <li
                     key={`${depth}-${index}-${file}`}
                     className="home-cover-position"
-                    style={{ "--cover-angle": `${angleOffset + index * 360 / files.length}deg`, "--cover-radius": radius } as CSSProperties}
+                    style={{ "--cover-angle": `${angleOffset + index * 360 / orbitFiles.length}deg`, "--cover-radius": radius } as CSSProperties}
                 >
                     <span className="home-cover-float" style={{ "--float-delay": `${-index * 0.43}s` } as CSSProperties}>
                         <img src={`/home-covers/${encodeURIComponent(file)}`} alt="" />
@@ -57,11 +108,19 @@ function HomeBackground() {
                 <div className="home-depth-ring ring-1" />
                 <div className="home-depth-ring ring-2" />
                 <div className="home-depth-ring ring-3" />
-                <div className="home-depth-ring ring-4" />
-                <CoverOrbit files={buildOrbit(48, 0)} radius="-52vw" duration={190} depth={1} angleOffset={2} />
-                <CoverOrbit files={buildOrbit(44, 7)} radius="-43vw" duration={164} depth={2} angleOffset={-4} reverse />
-                <CoverOrbit files={buildOrbit(40, 13)} radius="-34vw" duration={140} depth={3} angleOffset={6} />
-                <CoverOrbit files={buildOrbit(36, 3)} radius="-25vw" duration={118} depth={4} angleOffset={-8} reverse />
+                {coverOrbits.map((orbit) => (
+                    <CoverOrbit
+                        key={orbit.depth}
+                        files={orbit.files}
+                        radius={orbit.radius}
+                        duration={orbit.duration}
+                        depth={orbit.depth}
+                        angleOffset={orbit.angleOffset}
+                        reverse={"reverse" in orbit ? orbit.reverse : false}
+                        denseStep={"denseStep" in orbit ? orbit.denseStep : 2}
+                        denseLimit={"denseLimit" in orbit ? orbit.denseLimit : Infinity}
+                    />
+                ))}
             </div>
         </div>
     );
@@ -70,8 +129,8 @@ function HomeBackground() {
 const featureItems = [
     ["bg-amber-100", "fa-language", "text-amber-800", "高保真文白转换", "确保翻译后的白话文流畅且不失原文神韵"],
     ["bg-red-100", "fa-paint-brush", "text-red-800", "可控的风格化改编", "实现用户指定风格（如悬疑、喜剧）的稳定输出"],
-    ["bg-blue-100", "fa-mask", "text-blue-800", "分角色单视角故事", "生成符合人物叙述视角的限知故事，提升阅读沉浸感"],
-    ["bg-green-100", "fa-random", "text-green-800", "符合逻辑的分支情节", "生成既出人意料又合乎原作文本逻辑的新情节"]
+    ["bg-blue-100", "fa-diagram-project", "text-blue-800", "图谱化原典理解", "梳理人物关系、事件脉络与文本依据，让每次改编都有清晰根基"],
+    ["bg-green-100", "fa-comments", "text-green-800", "跨角色数字共演", "把经典角色带入同一场景，在人设一致的对话中碰撞出新故事"]
 ];
 
 export default function Home() {
@@ -178,17 +237,17 @@ export default function Home() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     {cards.map((card) => <motion.div
                         key={card.path}
-                        className="book-card home-function-card relative overflow-hidden group"
+                        className="book-card home-function-card relative flex overflow-hidden group"
                         variants={itemVariants}
                         whileHover={{ y: -10, transition: { duration: 0.3 } }}
                         onClick={() => navigate(card.path)}
                     >
                         <div className={`absolute top-0 right-0 w-24 h-24 ${card.accent} rounded-full -translate-y-12 translate-x-12 opacity-70 group-hover:scale-150 transition-transform duration-700 ease-out`} />
-                        <div className="relative z-10">
+                        <div className="relative z-10 flex h-full w-full flex-col">
                             <div className="mb-6 flex justify-center"><div className={`w-20 h-20 rounded-full ${card.accent} flex items-center justify-center`}><i className={`fa-solid ${card.icon} text-3xl`} /></div></div>
                             <h3 className="text-2xl title-serif text-center mb-3">{card.title}</h3>
-                            <p className="text-center mb-6 opacity-80">{card.description}</p>
-                            <button className="w-full btn-primary flex items-center justify-center gap-2"><span>{card.action}</span><i className="fa-solid fa-arrow-right" /></button>
+                            <p className="text-center mb-6 flex-1 opacity-80">{card.description}</p>
+                            <button className="h-10 w-full btn-primary flex items-center justify-center gap-2"><span>{card.action}</span><i className="fa-solid fa-arrow-right" /></button>
                         </div>
                     </motion.div>)}
                     </div>

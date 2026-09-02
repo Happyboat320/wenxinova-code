@@ -16,6 +16,7 @@ import { PrismaClient } from '@prisma/client';
 import * as XLSX from 'xlsx';
 import * as path from 'path';
 import * as fs from 'fs';
+import { resolveBookCover } from '../src/lib/book-covers';
 
 const prisma = new PrismaClient();
 
@@ -37,13 +38,11 @@ interface ExcelRow {
 // 默认 Excel 文件路径
 const DEFAULT_EXCEL_PATH = path.join(__dirname, '..', '小说目录信息.xlsx');
 
-// 默认封面图片
-const DEFAULT_IMAGE = 'https://img.zcool.cn/community/01e3c85e1f6f5da80120a8957c7227.jpg';
-
 const FOOTNOTE_REGEX = /\\?\[\d+\]/g;
 
 function normalizeLineBreaks(value: string): string {
-  return value.replace(/\r\n/g, '\n');
+  // Excel 单元格可能携带字面量“\\n”，统一转换为真实换行。
+  return value.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
 function stripFootnotes(value: string): string {
@@ -155,7 +154,7 @@ function transformRow(row: ExcelRow) {
     annotationCount,
     description,
     summary,
-    image: DEFAULT_IMAGE,
+    image: resolveBookCover({ title, category, theme, description, summary, keywords }),
   };
 }
 

@@ -1,5 +1,5 @@
 import prisma from '../../lib/prisma.js';
-import { generateCoPlayTurn } from '../../lib/deepseek.js';
+import { generateCoPlayTurn, generateFavoriteCharacterReply, generateJinlingParticipationOptions } from '../../lib/deepseek.js';
 import { ensureSearchIndexes } from '../../lib/manticore.js';
 import { syncCreationSearchDocument } from '../search/search.service.js';
 
@@ -122,6 +122,102 @@ export async function removeFavoriteCharacter(userId: number, id: number): Promi
   if (!existing) return false;
   await prisma.favoriteCharacter.delete({ where: { id } });
   return true;
+}
+
+export async function updateFavoriteCharacter(userId: number, id: number, input: {
+  description?: unknown;
+  deeds?: unknown;
+}) {
+  const existing = await prisma.favoriteCharacter.findFirst({ where: { id, userId }, select: { id: true } });
+  if (!existing) return { kind: 'missing' as const };
+
+  const description = normalizeOptional(input.description, 240);
+  const deeds = normalizeOptional(input.deeds, 4000);
+  const favorite = await prisma.favoriteCharacter.update({
+    where: { id },
+    data: {
+      description,
+      deeds,
+    },
+  });
+  return { kind: 'updated' as const, favorite };
+}
+
+export async function chatWithFavoriteCharacter(userId: number, id: number, input: {
+  message?: unknown;
+  history?: unknown;
+}) {
+  const message = cleanText(input.message, 1000);
+  if (!message) return { kind: 'invalid' as const };
+
+  const favorite = await prisma.favoriteCharacter.findFirst({ where: { id, userId } });
+  if (!favorite) return { kind: 'missing' as const };
+
+  const history = Array.isArray(input.history)
+    ? input.history.slice(-20).map(item => ({
+        role: item?.role === 'user' ? 'user' : 'character',
+        characterName: favorite.name,
+        content: cleanText(item?.content, 1200),
+      })).filter(item => item.content)
+    : [];
+
+  const content = await generateFavoriteCharacterReply({
+    name: favorite.name,
+    description: favorite.description,
+    deeds: favorite.deeds,
+    sourceTitle: favorite.sourceChapterTitle
+      ? `${favorite.sourceTitle || '未知文本'} · ${favorite.sourceChapterTitle}`
+      : favorite.sourceTitle,
+  }, history, message);
+
+  return {
+    kind: 'created' as const,
+    message: {
+      role: 'character' as const,
+      characterName: favorite.name,
+      content,
+      createdAt: new Date().toISOString(),
+    },
+  };
+}
+
+export async function createJinlingParticipationOptions(userId: number, input: {
+  favoriteCharacterId?: unknown;
+  context?: unknown;
+}) {
+  const favoriteCharacterId = Number(input.favoriteCharacterId);
+  if (!Number.isInteger(favoriteCharacterId) || favoriteCharacterId <= 0) return { kind: 'invalid' as const };
+
+  const favorite = await prisma.favoriteCharacter.findFirst({ where: { id: favoriteCharacterId, userId } });
+  if (!favorite) return { kind: 'missing' as const };
+
+  const context = Array.isArray(input.context)
+    ? input.context.slice(-8).map(item => ({
+        role: item?.role === 'character' ? 'character' : 'system',
+        characterName: cleanText(item?.characterName, 40) || null,
+        content: cleanText(item?.content, 500),
+      })).filter(item => item.content)
+    : [];
+
+  const options = await generateJinlingParticipationOptions({
+    name: favorite.name,
+    description: favorite.description,
+    deeds: favorite.deeds,
+    sourceTitle: favorite.sourceChapterTitle
+      ? `${favorite.sourceTitle || '未知文本'} · ${favorite.sourceChapterTitle}`
+      : favorite.sourceTitle,
+  }, context);
+
+  return {
+    kind: 'created' as const,
+    data: {
+      character: {
+        id: favorite.id,
+        name: favorite.name,
+      },
+      options,
+    },
+  };
 }
 
 export async function listSessions(userId: number) {

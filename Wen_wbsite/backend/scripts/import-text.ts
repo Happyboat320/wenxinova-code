@@ -95,7 +95,8 @@ function scanTextFiles(dirPath: string): string[] {
 }
 
 function normalizeNewlines(value: string): string {
-  return value.replace(/\r\n/g, '\n');
+  // 部分来源文件将换行转义为字面量“\\n”，导入前统一还原。
+  return value.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
 function stripFootnotes(value: string): string {

@@ -52,6 +52,54 @@ coPlayRouter.delete('/favorites/:id', requireAuth, async (req: Request, res: Res
   }
 });
 
+coPlayRouter.patch('/favorites/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json(error('无效的角色收藏 ID', 400));
+    const result = await coPlayService.updateFavoriteCharacter(req.auth!.userId, id, {
+      description: req.body?.description,
+      deeds: req.body?.deeds,
+    });
+    if (result.kind === 'missing') return res.status(404).json(error('收藏角色不存在', 404));
+    res.json(success(result.favorite, '角色属性已更新'));
+  } catch (caught) {
+    console.error('更新收藏角色失败:', caught);
+    res.status(500).json(error('更新收藏角色失败'));
+  }
+});
+
+coPlayRouter.post('/favorites/:id/chat', requireAuth, aiUsageGuard, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json(error('无效的角色收藏 ID', 400));
+    const result = await coPlayService.chatWithFavoriteCharacter(req.auth!.userId, id, {
+      message: req.body?.message,
+      history: req.body?.history,
+    });
+    if (result.kind === 'invalid') return res.status(400).json(error('请输入对话内容', 400));
+    if (result.kind === 'missing') return res.status(404).json(error('收藏角色不存在', 404));
+    res.json(success(result.message, '角色已回复'));
+  } catch (caught) {
+    console.error('角色对话失败:', caught);
+    res.status(500).json(error(caught instanceof Error ? caught.message : '角色对话失败'));
+  }
+});
+
+coPlayRouter.post('/jinling-letter/participation-options', requireAuth, aiUsageGuard, async (req: Request, res: Response) => {
+  try {
+    const result = await coPlayService.createJinlingParticipationOptions(req.auth!.userId, {
+      favoriteCharacterId: req.body?.favoriteCharacterId,
+      context: req.body?.context,
+    });
+    if (result.kind === 'invalid') return res.status(400).json(error('请选择一个收藏角色参与对话', 400));
+    if (result.kind === 'missing') return res.status(404).json(error('收藏角色不存在', 404));
+    res.json(success(result.data, '参与发言已生成'));
+  } catch (caught) {
+    console.error('生成黛玉葬花参与发言失败:', caught);
+    res.status(500).json(error(caught instanceof Error ? caught.message : '生成参与发言失败'));
+  }
+});
+
 coPlayRouter.get('/sessions', requireAuth, async (req: Request, res: Response) => {
   try {
     res.json(success(await coPlayService.listSessions(req.auth!.userId)));

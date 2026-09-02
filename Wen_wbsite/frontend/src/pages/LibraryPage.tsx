@@ -11,6 +11,7 @@ type Book = {
   category: string | null;
   description: string | null;
   summary: string | null;
+  image: string | null;
 };
 
 const LibraryPage = () => {
@@ -142,7 +143,7 @@ const LibraryPage = () => {
             {searchQuery && <button type="button" onClick={clearSearch} className="btn-secondary">清空</button>}
           </form>
 
-          {/* 分类与关键词可组合筛选，分类项仍完全来自业务数据库。 */}
+          {/* 分类与关键词可组合筛选，分类项由后端按业务口径返回。 */}
           <div className="mt-4 flex items-center gap-4">
             <label htmlFor="book-category" className="shrink-0 font-medium text-amber-800">
               <i className="fa-solid fa-layer-group mr-2" />题材体裁
@@ -189,7 +190,7 @@ const LibraryPage = () => {
             >
               <div className="h-60 overflow-hidden relative">
                 <img
-                  src="https://via.placeholder.com/400x240?text=古典文学"
+                  src={book.image || "/library-covers/警世恒言通用.png"}
                   alt={book.title}
                   className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                 />

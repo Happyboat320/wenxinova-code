@@ -124,7 +124,8 @@ export async function searchDocumentIds(options: {
   fields: string[];
   offset: number;
   limit: number;
-  category?: string;
+  category?: string | string[];
+  categoryNot?: string | string[];
 }): Promise<{ ids: number[]; total: number }> {
   const must: unknown[] = [{
     match: {
@@ -134,14 +135,32 @@ export async function searchDocumentIds(options: {
       },
     },
   }];
-  if (options.category) must.push({ equals: { category: options.category } });
+  if (Array.isArray(options.category)) {
+    const categories = [...new Set(options.category)].filter(Boolean);
+    if (categories.length === 1) {
+      must.push({ equals: { category: categories[0] } });
+    } else if (categories.length > 1) {
+      must.push({ in: { category: categories } });
+    }
+  } else if (options.category) {
+    must.push({ equals: { category: options.category } });
+  }
+  const mustNot: unknown[] = [];
+  const excludedCategories = Array.isArray(options.categoryNot)
+    ? [...new Set(options.categoryNot)].filter(Boolean)
+    : (options.categoryNot ? [options.categoryNot] : []);
+  if (excludedCategories.length === 1) {
+    mustNot.push({ equals: { category: excludedCategories[0] } });
+  } else if (excludedCategories.length > 1) {
+    mustNot.push({ in: { category: excludedCategories } });
+  }
 
   const response = await request('/search', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       index: options.index,
-      query: { bool: { must } },
+      query: { bool: mustNot.length > 0 ? { must, must_not: mustNot } : { must } },
       offset: options.offset,
       limit: options.limit,
       sort: [{ _score: 'desc' }, { id: 'asc' }],
