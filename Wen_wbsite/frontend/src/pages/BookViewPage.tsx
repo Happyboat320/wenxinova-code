@@ -41,6 +41,10 @@ export default function BookViewPage() {
   const [activeTab, setActiveTab] = useState<PageTab>('original');
   const [translation, setTranslation] = useState('');
   const [translationLoading, setTranslationLoading] = useState(false);
+  const [editingField, setEditingField] = useState<'original' | 'translation' | null>(null);
+  const [draftContent, setDraftContent] = useState('');
+  const [savingContent, setSavingContent] = useState(false);
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
@@ -77,22 +81,49 @@ export default function BookViewPage() {
     [bookData?.annotations],
   );
 
-  const showTranslation = async () => {
-    setActiveTab('translation');
-    if (translation) return;
+  const loadTranslation = async (): Promise<boolean> => {
+    if (translation) return true;
     if (!user) {
       toast.error('请先登录后查看译文');
       openLogin();
-      return;
+      return false;
     }
     try {
       setTranslationLoading(true);
-      setTranslation(await api.getBookTranslation(bookId, bookData?.chapter?.id));
+      const content = await api.getBookTranslation(bookId, bookData?.chapter?.id);
+      setTranslation(content);
+      return true;
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : '加载译文失败');
+      return false;
     } finally {
       setTranslationLoading(false);
     }
+  };
+
+  const beginEdit = (field: 'original' | 'translation') => {
+    const current = field === 'original' ? bookData.content : translation;
+    if (!current) return;
+    setDraftContent(current);
+    setEditingField(field);
+  };
+
+  const saveEdit = async () => {
+    if (!editingField || !draftContent.trim()) { toast.error('内容不能为空'); return; }
+    try {
+      setSavingContent(true);
+      const updated = await api.updateBookContent(bookId, { chapterId: bookData.chapter?.id, field: editingField, content: draftContent });
+      if (editingField === 'original') setBookData(current => current ? { ...current, content: updated } : current);
+      else setTranslation(updated);
+      setEditingField(null);
+      toast.success('内容已保存');
+    } catch (caught) { toast.error(caught instanceof Error ? caught.message : '保存内容失败'); }
+    finally { setSavingContent(false); }
+  };
+
+  const showTranslation = () => {
+    setActiveTab('translation');
+    void loadTranslation();
   };
 
   const renderText = (text: string, annotated: boolean) => {
@@ -215,19 +246,21 @@ export default function BookViewPage() {
 
             {activeTab === 'translation' ? (
               <div className="min-h-[320px] break-words rounded-lg border border-stone-100 bg-[#fffefa] p-4 font-serif text-base leading-8 sm:min-h-[420px] sm:p-6 sm:text-lg sm:leading-9">
-                {translationLoading ? '正在生成译文…' : translation ? <div className="whitespace-pre-wrap">{translation}</div> : (
+                {translationLoading ? '正在生成译文…' : translation ? (editingField === 'translation' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : <div className="whitespace-pre-wrap">{translation}</div>) : (
                   <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 text-stone-400">
                     <i className="fa-regular fa-file-lines text-3xl" />
                     <p>{user ? '点击“译文”加载内容' : '登录后可查看译文'}</p>
                     <button onClick={showTranslation} className="rounded-lg bg-amber-700 px-5 py-2 text-sm text-white hover:bg-amber-800">{user ? '加载译文' : '立即登录'}</button>
                   </div>
                 )}
+                {isAdmin && translation && !translationLoading && <div className="mt-4 flex gap-3"><button type="button" onClick={() => editingField === 'translation' ? void saveEdit() : beginEdit('translation')} disabled={savingContent} className="rounded-lg bg-amber-700 px-4 py-2 text-sm text-white">{editingField === 'translation' ? (savingContent ? '保存中…' : '保存') : '编辑'}</button>{editingField === 'translation' && <button type="button" onClick={() => setEditingField(null)} className="rounded-lg border border-stone-300 px-4 py-2 text-sm">取消</button>}</div>}
               </div>
             ) : (
               <>
                 <article className="min-h-[320px] whitespace-pre-wrap break-words rounded-lg border border-stone-100 bg-[#fffefa] p-4 font-serif text-base leading-8 sm:min-h-[420px] sm:p-8 sm:text-lg sm:leading-9">
-                  {renderText(bookData.content, activeTab === 'annotated')}
+                  {editingField === 'original' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : renderText(bookData.content, activeTab === 'annotated')}
                 </article>
+                {isAdmin && activeTab !== 'annotated' && <div className="mt-4 flex gap-3"><button type="button" onClick={() => editingField === 'original' ? void saveEdit() : beginEdit('original')} disabled={savingContent} className="rounded-lg bg-amber-700 px-4 py-2 text-sm text-white">{editingField === 'original' ? (savingContent ? '保存中…' : '保存') : '编辑'}</button>{editingField === 'original' && <button type="button" onClick={() => setEditingField(null)} className="rounded-lg border border-stone-300 px-4 py-2 text-sm">取消</button>}</div>}
                 {activeTab === 'annotated' && (
                   <aside className="mt-6 rounded-lg border border-amber-100 bg-amber-50/50 p-5">
                     <h3 className="mb-4 font-serif text-lg font-semibold text-amber-900">注释</h3>
@@ -255,7 +288,11 @@ export default function BookViewPage() {
             title={bookData.chapter ? `${bookData.title} · ${bookData.chapter.title}` : bookData.title} author={bookData.author}
             sourceTitle={bookData.title}
             sourceChapterTitle={bookData.chapter?.title || null}
-            originalText={bookData.content} characters={bookData.characters}
+            originalText={bookData.content}
+            translation={translation}
+            translationLoading={translationLoading}
+            onRequestTranslation={loadTranslation}
+            characters={bookData.characters}
             initialMode={new URLSearchParams(location.search).get('mode') === 'script' ? 'script' : 'style'}
             initialScriptSection={initialScriptSection} />
         )}

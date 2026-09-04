@@ -36,6 +36,7 @@ model Book {
   creations   Creation[]
   favoriteCharacters FavoriteCharacter[]
   knowledgeGraph BookKnowledgeGraph?
+  contentEditHistory BookContentEdit[]
 }
 
 // 长篇作品的回目；普通单篇作品继续直接使用 Book.originalText。
@@ -48,14 +49,35 @@ model BookChapter {
   translatedText String?
   summary        String?
   keywords       String?
+  annotationsJson String?  // 本回注释，JSON 数组：[{ index, content }]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
   favoriteCharacters FavoriteCharacter[]
+  contentEditHistory BookContentEdit[]
 
   @@unique([bookId, order])
   @@index([bookId, title])
+}
+
+// 管理员修改文库正文或译文的审计记录。
+model BookContentEdit {
+  id         Int      @id @default(autoincrement())
+  bookId     Int
+  chapterId  Int?
+  editorId   Int
+  field      String   // original/translation
+  oldContent String
+  newContent String
+  createdAt  DateTime @default(now())
+
+  book    Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapter BookChapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  editor  User        @relation(fields: [editorId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, createdAt])
+  @@index([editorId, createdAt])
 }
 
 // 由 LLM 生成并复用的书籍知识图谱，JSON 以文本保存以兼容 SQLite。
@@ -114,6 +136,7 @@ model User {
   adminApplications AdminApplication[] @relation("AdminApplicant")
   reviewedAdminApplications AdminApplication[] @relation("AdminApplicationReviewer")
   reviewedCreations Creation[] @relation("CreationReviewer")
+  contentEdits BookContentEdit[]
   refreshSessions RefreshSession[]
   favoriteCharacters FavoriteCharacter[]
   coPlaySessions CoPlaySession[]

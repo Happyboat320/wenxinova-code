@@ -284,6 +284,12 @@ export async function getBookTranslation(id: number, chapterId?: number): Promis
   return unwrap(response.data, '获取译文失败').translation;
 }
 
+// 管理员保存当前单篇/回目的原文或已生成译文。
+export async function updateBookContent(id: number, data: { chapterId?: number; field: 'original' | 'translation'; content: string }): Promise<string> {
+  const response = await client.patch<ApiResponse<{ content: string }>>(`/admin/books/${id}/content`, data);
+  return unwrap(response.data, '保存内容失败').content;
+}
+
 export async function getKnowledgeGraph(id: number): Promise<KnowledgeGraph | null> {
   const response = await client.get<ApiResponse<KnowledgeGraph | null>>(`/books/${id}/knowledge-graph`);
   return unwrap(response.data, '获取知识图谱失败');
@@ -310,6 +316,70 @@ export async function adaptBook(
     prompt,
   });
   return unwrap(response.data, '生成内容失败').adaptedContent;
+}
+
+export async function adaptBookStream(
+  translation: string,
+  type: 'adapt' | 'creative' | 'script' | 'custom' | 'continue',
+  prompt: string,
+  onDelta: (content: string) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const url = `${baseURL.replace(/\/$/, '')}/adapt/stream`;
+  const request = (token: string | null) => fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ translation, type, prompt }),
+    signal,
+  });
+
+  let response = await request(accessToken);
+  if (response.status === 401) {
+    try {
+      const session = await requestRefresh();
+      response = await request(session.accessToken);
+    } catch {
+      setAccessToken(null);
+      authFailureHandler?.();
+      throw new Error('登录状态已失效，请重新登录');
+    }
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as ApiResponse<unknown> | null;
+    throw new Error(body?.message || `生成请求失败（HTTP ${response.status}）`);
+  }
+  if (!response.body) throw new Error('当前浏览器不支持流式响应');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let completed = false;
+  const consumeEvent = (rawEvent: string) => {
+    const lines = rawEvent.split('\n');
+    const event = lines.find(line => line.startsWith('event:'))?.slice(6).trim() || 'message';
+    const data = lines.filter(line => line.startsWith('data:')).map(line => line.slice(5).trim()).join('\n');
+    if (!data) return;
+    const payload = JSON.parse(data) as { content?: string; message?: string };
+    if (event === 'delta' && payload.content) onDelta(payload.content);
+    if (event === 'done') completed = true;
+    if (event === 'error') throw new Error(payload.message || '内容生成失败');
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, '\n');
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+    for (const event of events) consumeEvent(event);
+    if (done) break;
+  }
+  if (buffer.trim()) consumeEvent(buffer);
+  if (!completed) throw new Error('生成连接意外中断，请保留已生成内容后重试');
 }
 
 export async function analyzeCharacters(originalText: string): Promise<AnalyzedCharacter[]> {

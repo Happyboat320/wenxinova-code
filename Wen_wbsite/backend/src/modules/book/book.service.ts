@@ -245,6 +245,7 @@ export async function getBookContent(id: number, chapterId?: number) {
           title: true,
           originalText: true,
           summary: true,
+          annotationsJson: true,
         },
         orderBy: { order: 'asc' },
       },
@@ -270,7 +271,7 @@ export async function getBookContent(id: number, chapterId?: number) {
     } : null,
     chapters: book.chapters.map(chapter => ({ id: chapter.id, order: chapter.order, title: chapter.title })),
     // 保留数据库里的真实序号；注释可能不是从 1 连续排列，不能再用数组下标猜测序号。
-    annotations: activeChapter ? [] : book.annotations,
+    annotations: activeChapter ? parseChapterAnnotations(activeChapter.annotationsJson) : book.annotations,
     characters: book.characters.length > 0
       ? book.characters
       : (book.mainCharacters || '')
@@ -278,6 +279,22 @@ export async function getBookContent(id: number, chapterId?: number) {
           .map((name, index) => ({ id: -(index + 1), name: name.trim(), description: null }))
           .filter(character => character.name),
   };
+}
+
+function parseChapterAnnotations(value: string | null): Array<{ index: number; content: string }> {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((annotation): annotation is { index: number; content: string } => (
+      annotation !== null
+      && typeof annotation === 'object'
+      && Number.isInteger((annotation as { index?: unknown }).index)
+      && typeof (annotation as { content?: unknown }).content === 'string'
+    ));
+  } catch {
+    return [];
+  }
 }
 
 // 分类取自数据库实际值，并按产品口径合并为八个固定展示类。
@@ -349,4 +366,31 @@ export async function streamTranslation(id: number, res: any, chapterId?: number
   const translation = await getTranslation(id, chapterId);
   res.write(translation);
   res.end();
+}
+
+// 管理员覆盖文库内容，并把修改前后的完整文本写入审计表。
+export async function updateBookContent(
+  bookId: number,
+  chapterId: number | undefined,
+  field: 'original' | 'translation',
+  content: string,
+  editorId: number,
+) {
+  const text = content.trim();
+  if (!text) throw new Error('内容不能为空');
+  return prisma.$transaction(async tx => {
+    const book = await tx.book.findUnique({ where: { id: bookId }, select: { originalText: true, translatedText: true, chapters: { select: { id: true, originalText: true, translatedText: true } } } });
+    if (!book) return null;
+    const chapter = chapterId === undefined ? undefined : book.chapters.find(item => item.id === chapterId);
+    if (chapterId !== undefined && !chapter) throw new Error('回目不存在或不属于当前作品');
+    const oldContent = chapter ? (field === 'original' ? chapter.originalText : chapter.translatedText) : (field === 'original' ? book.originalText : book.translatedText);
+    if (oldContent == null) throw new Error('译文尚未生成，暂不可修改');
+    if (chapter) {
+      await tx.bookChapter.update({ where: { id: chapter.id }, data: field === 'original' ? { originalText: text } : { translatedText: text } });
+    } else {
+      await tx.book.update({ where: { id: bookId }, data: field === 'original' ? { originalText: text } : { translatedText: text } });
+    }
+    await tx.bookContentEdit.create({ data: { bookId, chapterId: chapter?.id, editorId, field, oldContent, newContent: text } });
+    return text;
+  });
 }
