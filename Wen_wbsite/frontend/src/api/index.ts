@@ -286,7 +286,7 @@ export async function getBookTranslation(id: number, chapterId?: number): Promis
 
 // 管理员保存当前单篇/回目的原文或已生成译文。
 export async function updateBookContent(id: number, data: { chapterId?: number; field: 'original' | 'translation'; content: string }): Promise<string> {
-  const response = await client.patch<ApiResponse<{ content: string }>>(`/admin/books/${id}/content`, data);
+  const response = await client.patch<ApiResponse<{ content: string }>>(`/books/${id}/content`, data);
   return unwrap(response.data, '保存内容失败').content;
 }
 
