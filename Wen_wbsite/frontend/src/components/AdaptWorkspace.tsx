@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AuthContext } from '@/contexts/authContext';
 import MarkdownContent from '@/components/MarkdownContent';
@@ -17,6 +17,9 @@ interface Props {
   title: string;
   author: string;
   originalText: string;
+  translation: string;
+  translationLoading: boolean;
+  onRequestTranslation: () => Promise<boolean>;
   characters: Character[];
   sourceTitle?: string;
   sourceChapterTitle?: string | null;
@@ -26,6 +29,7 @@ interface Props {
 
 type WorkspaceMode = 'style' | 'script';
 type ScriptSection = 'props' | 'role' | 'dm';
+type SourceMode = 'original' | 'translation';
 
 interface WorkspaceCache {
   style: string;
@@ -56,7 +60,7 @@ const scriptSectionCopy: Record<Exclude<ScriptSection, 'role'>, { title: string;
   },
 };
 
-export default function AdaptWorkspace({ bookId, chapterId, title, author, originalText, characters, sourceTitle, sourceChapterTitle, initialMode = 'style', initialScriptSection = 'role' }: Props) {
+export default function AdaptWorkspace({ bookId, chapterId, title, author, originalText, translation, translationLoading, onRequestTranslation, characters, sourceTitle, sourceChapterTitle, initialMode = 'style', initialScriptSection = 'role' }: Props) {
   const { user, openLogin } = useContext(AuthContext);
   const [mode, setMode] = useState<WorkspaceMode>(initialMode);
   const [style, setStyle] = useState(styles[0]);
@@ -78,6 +82,14 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
   const [persistedVersion, setPersistedVersion] = useState<{ status: api.Creation['status']; content: string } | null>(null);
   const [favoriteCharacters, setFavoriteCharacters] = useState<api.FavoriteCharacter[]>([]);
   const [favoriteSaving, setFavoriteSaving] = useState<number | null>(null);
+  const [sourceMode, setSourceMode] = useState<SourceMode>('original');
+  const [batchGenerating, setBatchGenerating] = useState(false);
+  const [scriptBatchResults, setScriptBatchResults] = useState<Partial<Record<ScriptSection, string>>>({});
+  const streamControllerRef = useRef<AbortController | null>(null);
+
+  const sourceText = sourceMode === 'translation' ? translation : originalText;
+
+  useEffect(() => () => streamControllerRef.current?.abort(), []);
 
   const roleOptions = generatedCharacters.length > 0 ? generatedCharacters : characters;
 
@@ -172,18 +184,60 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
       openLogin();
       return;
     }
-    if (!originalText.trim()) {
-      toast.error('当前作品没有可用于改编的原文');
+    if (!sourceText.trim()) {
+      toast.error(`当前作品没有可用于改编的${sourceMode === 'translation' ? '译文' : '原文'}`);
       return;
     }
     try {
+      streamControllerRef.current?.abort();
+      const controller = new AbortController();
+      streamControllerRef.current = controller;
       setLoading(true);
-      setResult(await api.adaptBook(originalText, request.type, request.prompt));
+      setResult('');
+      await api.adaptBookStream(
+        sourceText,
+        request.type,
+        request.prompt,
+        content => setResult(current => current + content),
+        controller.signal,
+      );
     } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : '内容生成失败');
+      if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
+        toast.error(caught instanceof Error ? caught.message : '内容生成失败');
+      }
     } finally {
+      streamControllerRef.current = null;
       setLoading(false);
     }
+  };
+
+  // 一键按“分角色剧本→道具→DM”顺序生成，并将前一步结果拼入下一步提示词。
+  const generateScriptBatch = async () => {
+    if (!user) { toast.error('请先登录后使用 AI 创作'); openLogin(); return; }
+    if (!sourceText.trim()) { toast.error('当前作品没有可用于改编的原文'); return; }
+    setBatchGenerating(true);
+    const outputs: Partial<Record<ScriptSection, string>> = {};
+    try {
+      const steps: Array<{ key: ScriptSection; prompt: string }> = [
+        { key: 'role', prompt: `请为以下原文生成完整的分角色剧本，重点描写${selectedCharacter}的背景、秘密、目标、关系和行动时间线。` },
+        { key: 'props', prompt: scriptSectionCopy.props.prompt },
+        { key: 'dm', prompt: scriptSectionCopy.dm.prompt },
+      ];
+      let context = '';
+      for (const step of steps) {
+        setScriptSection(step.key);
+        setResult('');
+        let output = '';
+        await api.adaptBookStream(sourceText, 'custom', `${step.prompt}\n\n前序生成内容（请保持一致并继续完善）：\n${context.slice(-12000)}`, chunk => { output += chunk; setResult(current => current + chunk); });
+        outputs[step.key] = output;
+        context += `\n【${step.key}】\n${output}`;
+      }
+      setScriptBatchResults(outputs);
+      setScriptSection('role');
+      setResult(outputs.role || '');
+      toast.success('剧本杀三部分已全部生成');
+    } catch (caught) { toast.error(caught instanceof Error ? caught.message : '一键生成失败'); }
+    finally { setBatchGenerating(false); }
   };
 
   const analyzeCharacters = async () => {
@@ -194,7 +248,8 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
     }
     try {
       setAnalyzingCharacters(true);
-      const parsed = await api.analyzeCharacters(originalText);
+      if (!sourceText.trim()) throw new Error(`当前没有可分析的${sourceMode === 'translation' ? '译文' : '原文'}`);
+      const parsed = await api.analyzeCharacters(sourceText);
       if (parsed.length === 0) throw new Error('未能识别角色，请稍后重试');
       setGeneratedCharacters(parsed);
       setSelectedCharacter(parsed[0].name);
@@ -204,6 +259,15 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
     } finally {
       setAnalyzingCharacters(false);
     }
+  };
+
+  const changeSourceMode = async (nextMode: SourceMode) => {
+    if (nextMode === 'original') {
+      setSourceMode('original');
+      return;
+    }
+    setSourceMode('translation');
+    if (!translation && !await onRequestTranslation()) setSourceMode('original');
   };
 
   const isFavorite = (character: Character) => favoriteCharacters.some(favorite => (
@@ -252,20 +316,29 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
       return;
     }
     try {
+      streamControllerRef.current?.abort();
+      const controller = new AbortController();
+      streamControllerRef.current = controller;
       setContinuing(true);
       setContinuationDialogOpen(false);
-      const continuation = await api.adaptBook(
+      const existingResult = result.trimEnd();
+      setResult(`${existingResult}\n\n`);
+      await api.adaptBookStream(
         // 仅传递末尾上下文，避免多次续写后请求体超限。
         result.slice(-12000),
         'continue',
         requirement.trim() || '根据上文自由续写，保持文风和情节连贯',
+        content => setResult(current => current + content),
+        controller.signal,
       );
-      setResult(current => `${current.trimEnd()}\n\n${continuation.trimStart()}`);
       setContinuationRequirement('');
       toast.success('续写内容已追加');
     } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : '续写失败');
+      if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
+        toast.error(caught instanceof Error ? caught.message : '续写失败');
+      }
     } finally {
+      streamControllerRef.current = null;
       setContinuing(false);
     }
   };
@@ -336,7 +409,8 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
 
       {mode === 'style' ? (
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(260px,0.85fr)_minmax(380px,1.2fr)_minmax(220px,0.65fr)] lg:gap-6">
-          <OriginalPanel className={panel} text={originalText} />
+          <OriginalPanel className={panel} text={sourceText} sourceMode={sourceMode}
+            loading={translationLoading} disabled={loading || continuing} onSourceChange={changeSourceMode} />
           <OutputPanel
             className={panel}
             title={outputTitle}
@@ -361,12 +435,16 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
         </div>
       ) : (
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(280px,0.75fr)_minmax(560px,1.75fr)] lg:gap-6">
-          <OriginalPanel className={panel} text={originalText} />
+          <OriginalPanel className={panel} text={sourceText} sourceMode={sourceMode}
+            loading={translationLoading} disabled={loading || continuing} onSourceChange={changeSourceMode} />
           <div>
-            <div className="mb-6 grid grid-cols-3 border-b border-amber-200">
+            <div className="mb-6 flex items-center border-b border-amber-200">
+              <div className="grid flex-1 grid-cols-3">
               {([['props', '道具'], ['role', '分角色剧本'], ['dm', 'DM(主持人)']] as const).map(([key, label]) => (
-                <button key={key} onClick={() => { setScriptSection(key); setResult(''); }} className={`border-b-2 px-4 py-3 text-lg ${scriptSection === key ? 'border-amber-600 text-amber-800' : 'border-transparent text-gray-600'}`}>{label}</button>
+                <button key={key} onClick={() => { setScriptSection(key); setResult(scriptBatchResults[key] || ''); }} className={`border-b-2 px-4 py-3 text-lg ${scriptSection === key ? 'border-amber-600 text-amber-800' : 'border-transparent text-gray-600'}`}>{label}</button>
               ))}
+              </div>
+              <button type="button" onClick={() => void generateScriptBatch()} disabled={batchGenerating || loading} className="btn-primary ml-3 whitespace-nowrap text-sm disabled:opacity-50"><i className="fa-solid fa-bolt mr-1" />{batchGenerating ? '一键生成中…' : '一键生成'}</button>
             </div>
             {scriptSection === 'role' && (
               <div className="mb-6">
@@ -447,8 +525,34 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
   );
 }
 
-function OriginalPanel({ className, text }: { className: string; text: string }) {
-  return <section className={`${className} min-w-0 p-4 sm:p-6`}><h3 className="mb-4 text-xl font-medium"><i className="fa-solid fa-bookmark mr-2 text-amber-700" />原文</h3><div className="h-[55dvh] min-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-amber-200 p-4 font-serif text-base leading-8 sm:h-[620px] sm:p-5 sm:text-lg">{text || '暂无原文'}</div></section>;
+function OriginalPanel({ className, text, sourceMode, loading, disabled, onSourceChange }: {
+  className: string;
+  text: string;
+  sourceMode: SourceMode;
+  loading: boolean;
+  disabled: boolean;
+  onSourceChange: (mode: SourceMode) => void | Promise<void>;
+}) {
+  return (
+    <section className={`${className} min-w-0 p-4 sm:p-6`}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-xl font-medium"><i className="fa-solid fa-bookmark mr-2 text-amber-700" />改编素材</h3>
+        <div className="inline-flex rounded-lg border border-amber-200 bg-amber-50 p-1 text-sm" aria-label="切换改编素材">
+          <button type="button" disabled={disabled} onClick={() => void onSourceChange('original')}
+            className={`rounded-md px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50 ${sourceMode === 'original' ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>
+            原文
+          </button>
+          <button type="button" disabled={disabled || loading} onClick={() => void onSourceChange('translation')}
+            className={`rounded-md px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50 ${sourceMode === 'translation' ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>
+            {loading ? '译文加载中…' : '译文'}
+          </button>
+        </div>
+      </div>
+      <div className="h-[55dvh] min-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-amber-200 p-4 font-serif text-base leading-8 sm:h-[620px] sm:p-5 sm:text-lg">
+        {loading && sourceMode === 'translation' ? '正在加载译文…' : text || `暂无${sourceMode === 'translation' ? '译文' : '原文'}`}
+      </div>
+    </section>
+  );
 }
 
 function OutputPanel({ className, title, result, onChange, loading, onGenerate, continuation }: {

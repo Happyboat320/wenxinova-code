@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import * as api from '@/api';
@@ -7,6 +7,7 @@ import KnowledgeGraphView from '@/components/KnowledgeGraphView';
 import { AuthContext } from '@/contexts/authContext';
 import { useTheme } from '@/hooks/useTheme';
 import SiteHeader from '@/components/SiteHeader';
+import { useReadingPreferences, type ReadingBackground } from '@/hooks/useReadingPreferences';
 
 type ReadingTab = 'original' | 'annotated' | 'translation';
 type PageTab = ReadingTab | 'adapt' | 'knowledge';
@@ -45,6 +46,7 @@ export default function BookViewPage() {
   const [draftContent, setDraftContent] = useState('');
   const [savingContent, setSavingContent] = useState(false);
   const isAdmin = user?.role === 'admin';
+  const { preferences, setPreferences } = useReadingPreferences();
 
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get('tab');
@@ -52,6 +54,8 @@ export default function BookViewPage() {
       setActiveTab(tab as PageTab);
     }
   }, [location.search]);
+
+  useEffect(() => { if (bookData && bookData.annotations.length === 0 && activeTab === 'annotated') setActiveTab('original'); }, [activeTab, bookData]);
 
   useEffect(() => {
     const load = async () => {
@@ -102,14 +106,14 @@ export default function BookViewPage() {
   };
 
   const beginEdit = (field: 'original' | 'translation') => {
-    const current = field === 'original' ? bookData.content : translation;
+    const current = field === 'original' ? bookData?.content : translation;
     if (!current) return;
     setDraftContent(current);
     setEditingField(field);
   };
 
   const saveEdit = async () => {
-    if (!editingField || !draftContent.trim()) { toast.error('内容不能为空'); return; }
+    if (!editingField || !draftContent.trim() || !bookData) { toast.error('内容不能为空'); return; }
     try {
       setSavingContent(true);
       const updated = await api.updateBookContent(bookId, { chapterId: bookData.chapter?.id, field: editingField, content: draftContent });
@@ -126,11 +130,12 @@ export default function BookViewPage() {
     void loadTranslation();
   };
 
+  const indentLines = (text: string) => bookData?.title === '明清传奇' ? text : text.split('\n').map(line => `　　${line}`).join('\n');
   const renderText = (text: string, annotated: boolean) => {
     const normalized = text.replace(ESCAPED_MARKER_PATTERN, '');
-    if (!annotated) return normalized.replace(MARKER_PATTERN, '');
+    if (!annotated) return indentLines(normalized.replace(MARKER_PATTERN, ''));
 
-    return normalized.split(MARKER_PATTERN).map((part, index) => {
+    return indentLines(normalized).split(MARKER_PATTERN).map((part, index) => {
       const number = part.match(/\d+/)?.[0];
       if (!number) return <span key={index}>{part}</span>;
       const annotationIndex = Number(number);
@@ -167,9 +172,13 @@ export default function BookViewPage() {
     params.set('chapter', String(chapterId));
     navigate({ search: params.toString() });
   };
+  const backgroundStyle: CSSProperties = preferences.background === 'custom' && preferences.customImage
+    ? { backgroundImage: `url(${preferences.customImage})`, backgroundSize: 'cover', backgroundAttachment: 'fixed' }
+    : {};
+  const backgroundClass: Record<ReadingBackground, string> = { paper: 'bg-[#f8f5ef]', mist: 'bg-slate-100', ink: 'bg-stone-800', green: 'bg-emerald-50', custom: 'bg-[#f8f5ef]' };
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-stone-950 text-stone-100' : 'bg-[#f8f5ef] text-stone-800'}`}>
+    <div style={backgroundStyle} className={`min-h-screen ${isDark ? 'bg-stone-950 text-stone-100' : `${backgroundClass[preferences.background]} text-stone-800`}`}>
       <div className={`border-b px-4 py-4 sm:px-6 lg:px-12 ${isDark ? 'border-stone-800' : 'border-amber-100/80'}`}>
         <SiteHeader beforeNavigation={<button onClick={() => navigate('/classical-library')} className="text-stone-500 transition hover:text-amber-800">← 返回文库</button>} />
       </div>
@@ -225,28 +234,28 @@ export default function BookViewPage() {
             className={`px-2 py-3 text-sm transition sm:px-8 sm:text-base ${readingActive ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>
             阅读文本
           </button>
+          <button onClick={() => setActiveTab('knowledge')} className={`px-2 py-3 text-sm transition sm:px-8 sm:text-base ${activeTab === 'knowledge' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>知识图谱</button>
           <button onClick={() => setActiveTab('adapt')}
             className={`px-2 py-3 text-sm transition sm:px-8 sm:text-base ${activeTab === 'adapt' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>
             创意工坊
           </button>
-          <button onClick={() => setActiveTab('knowledge')} className={`px-2 py-3 text-sm transition sm:px-8 sm:text-base ${activeTab === 'knowledge' ? 'border-b-2 border-amber-600 bg-amber-50 text-amber-800' : 'text-stone-600 hover:text-amber-800'}`}>知识图谱</button>
         </div>
 
         {readingActive ? (
           <section className={`rounded-xl border p-5 shadow-lg sm:p-8 ${isDark ? 'border-stone-800 bg-stone-900' : 'border-stone-100 bg-white'}`}>
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
               <h2 className="font-serif text-xl font-semibold text-amber-900">文本阅读</h2>
-              <span className="text-sm text-stone-400">共 {bookData.annotations.length} 条注释</span>
+              <div className="flex items-center gap-3 text-sm text-stone-400"><span>共 {bookData.annotations.length} 条注释</span><label>字号 <select value={preferences.fontSize} onChange={e => setPreferences(p => ({ ...p, fontSize: Number(e.target.value) }))} className="rounded border border-amber-200 px-1 py-1 text-stone-700"><option value="16">小</option><option value="18">标准</option><option value="20">大</option><option value="24">特大</option></select></label><label>背景 <select value={preferences.background} onChange={e => setPreferences(p => ({ ...p, background: e.target.value as ReadingBackground }))} className="rounded border border-amber-200 px-1 py-1 text-stone-700"><option value="paper">宣纸</option><option value="mist">雾灰</option><option value="green">青绿</option><option value="ink">墨色</option><option value="custom">本地图片</option></select></label><label className="cursor-pointer text-amber-700">选图<input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setPreferences(p => ({ ...p, background: 'custom', customImage: String(reader.result) })); reader.readAsDataURL(file); }} /></label></div>
             </div>
             <div className="mb-6 flex flex-wrap gap-3">
               <button onClick={() => setActiveTab('original')} className={`rounded-lg border px-5 py-2 ${activeTab === 'original' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-stone-200 hover:bg-stone-50'}`}>原文</button>
-              <button onClick={() => setActiveTab('annotated')} className={`rounded-lg border px-5 py-2 ${activeTab === 'annotated' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-stone-200 hover:bg-stone-50'}`}>原文 + 注释</button>
+              {bookData.annotations.length > 0 && <button onClick={() => setActiveTab('annotated')} className={`rounded-lg border px-5 py-2 ${activeTab === 'annotated' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-stone-200 hover:bg-stone-50'}`}>原文 + 注释</button>}
               <button onClick={showTranslation} className={`rounded-lg border px-5 py-2 ${activeTab === 'translation' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-stone-200 hover:bg-stone-50'}`}>译文</button>
             </div>
 
             {activeTab === 'translation' ? (
-              <div className="min-h-[320px] break-words rounded-lg border border-stone-100 bg-[#fffefa] p-4 font-serif text-base leading-8 sm:min-h-[420px] sm:p-6 sm:text-lg sm:leading-9">
-                {translationLoading ? '正在生成译文…' : translation ? (editingField === 'translation' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : <div className="whitespace-pre-wrap">{translation}</div>) : (
+              <div style={{ fontSize: `${preferences.fontSize}px` }} className="min-h-[320px] break-words rounded-lg border border-stone-100 bg-[#fffefa]/90 p-4 font-serif leading-8 sm:min-h-[420px] sm:p-6 sm:leading-9">
+                {translationLoading ? '正在生成译文…' : translation ? (editingField === 'translation' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : <div className="whitespace-pre-wrap">{indentLines(translation)}</div>) : (
                   <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 text-stone-400">
                     <i className="fa-regular fa-file-lines text-3xl" />
                     <p>{user ? '点击“译文”加载内容' : '登录后可查看译文'}</p>
@@ -257,7 +266,7 @@ export default function BookViewPage() {
               </div>
             ) : (
               <>
-                <article className="min-h-[320px] whitespace-pre-wrap break-words rounded-lg border border-stone-100 bg-[#fffefa] p-4 font-serif text-base leading-8 sm:min-h-[420px] sm:p-8 sm:text-lg sm:leading-9">
+                <article style={{ fontSize: `${preferences.fontSize}px` }} className="min-h-[320px] whitespace-pre-wrap break-words rounded-lg border border-stone-100 bg-[#fffefa]/90 p-4 font-serif leading-8 sm:min-h-[420px] sm:p-8 sm:leading-9">
                   {editingField === 'original' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : renderText(bookData.content, activeTab === 'annotated')}
                 </article>
                 {isAdmin && activeTab !== 'annotated' && <div className="mt-4 flex gap-3"><button type="button" onClick={() => editingField === 'original' ? void saveEdit() : beginEdit('original')} disabled={savingContent} className="rounded-lg bg-amber-700 px-4 py-2 text-sm text-white">{editingField === 'original' ? (savingContent ? '保存中…' : '保存') : '编辑'}</button>{editingField === 'original' && <button type="button" onClick={() => setEditingField(null)} className="rounded-lg border border-stone-300 px-4 py-2 text-sm">取消</button>}</div>}
