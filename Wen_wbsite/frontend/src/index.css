@@ -131,6 +131,40 @@ body {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(139, 35, 35, 0.05);
 }
 
+/* 阅读器主题统一驱动页面、卡片、控件与文字，避免只切换外层背景。 */
+.reading-page {
+  --reading-bg: #f8f5ef;
+  --reading-surface: rgba(255, 255, 255, .94);
+  --reading-paper: rgba(255, 254, 250, .92);
+  --reading-text: #3f372f;
+  --reading-muted: #78716c;
+  --reading-accent: #92400e;
+  --reading-border: #ead6ae;
+  --reading-soft: #fef3c7;
+  color: var(--reading-text);
+  background-color: var(--reading-bg);
+}
+.reading-theme-mist { --reading-bg: #e8edf1; --reading-surface: rgba(246,248,250,.95); --reading-paper: rgba(241,245,249,.94); --reading-text: #293642; --reading-muted: #607080; --reading-accent: #38566d; --reading-border: #bac8d2; --reading-soft: #dce6ed; }
+.reading-theme-green { --reading-bg: #e4eee6; --reading-surface: rgba(244,249,244,.95); --reading-paper: rgba(239,247,239,.94); --reading-text: #273c2e; --reading-muted: #5d7564; --reading-accent: #356145; --reading-border: #b6ceb9; --reading-soft: #d8e9da; }
+.reading-theme-ink { --reading-bg: #1c1917; --reading-surface: rgba(41,37,36,.96); --reading-paper: rgba(28,25,23,.94); --reading-text: #eee7dc; --reading-muted: #b8afa4; --reading-accent: #e9bd78; --reading-border: #62584d; --reading-soft: #4a4035; }
+.reading-theme-custom { --reading-bg: #eee7da; --reading-surface: rgba(255,253,248,.88); --reading-paper: rgba(255,253,248,.9); --reading-text: #332d27; --reading-muted: #6d6258; --reading-accent: #854d20; --reading-border: #d6bd96; --reading-soft: #f4e6ce; }
+.reading-header { border-color: var(--reading-border); background: color-mix(in srgb, var(--reading-bg) 86%, transparent); }
+.reading-card { color: var(--reading-text); border-color: var(--reading-border); background: var(--reading-surface); }
+.reading-paper { color: var(--reading-text); border-color: var(--reading-border); background: var(--reading-paper); }
+.reading-control { color: var(--reading-text); border-color: var(--reading-border); background: var(--reading-paper); }
+.reading-control span { border-color: var(--reading-border); }
+.reading-step-button:hover:not(:disabled), .reading-button:hover { background: var(--reading-soft); }
+.reading-button { color: var(--reading-accent); border-color: var(--reading-border); }
+.reading-accent { color: var(--reading-accent) !important; }
+.reading-muted { color: var(--reading-muted) !important; }
+.reading-divider { border-color: var(--reading-border); }
+/* 兼容阅读页内暂未语义化的 Tailwind 色类。 */
+.reading-page .text-stone-400, .reading-page .text-stone-500, .reading-page .text-stone-600, .reading-page .text-stone-700 { color: var(--reading-muted); }
+.reading-page .text-stone-800, .reading-page .text-stone-900 { color: var(--reading-text); }
+.reading-page .text-amber-700, .reading-page .text-amber-800, .reading-page .text-amber-900 { color: var(--reading-accent); }
+.reading-page .bg-amber-50, .reading-page .bg-amber-50\/50 { background-color: var(--reading-soft); }
+.reading-page .border-amber-100, .reading-page .border-amber-200, .reading-page .border-amber-300, .reading-page .border-stone-100, .reading-page .border-stone-200, .reading-page .border-stone-300 { border-color: var(--reading-border); }
+
 /* AI 与社区正文的 Markdown 排版，不依赖额外的 Typography 插件。 */
 .markdown-content {
   @apply break-words leading-8 text-gray-800;

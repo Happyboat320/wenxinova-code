@@ -5,9 +5,8 @@ import * as api from '@/api';
 import AdaptWorkspace from '@/components/AdaptWorkspace';
 import KnowledgeGraphView from '@/components/KnowledgeGraphView';
 import { AuthContext } from '@/contexts/authContext';
-import { useTheme } from '@/hooks/useTheme';
 import SiteHeader from '@/components/SiteHeader';
-import { useReadingPreferences, type ReadingBackground } from '@/hooks/useReadingPreferences';
+import { READING_FONT_SIZES, useReadingPreferences, type ReadingBackground } from '@/hooks/useReadingPreferences';
 
 type ReadingTab = 'original' | 'annotated' | 'translation';
 type PageTab = ReadingTab | 'adapt' | 'knowledge';
@@ -30,7 +29,6 @@ export default function BookViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isDark } = useTheme();
   const { user, openLogin } = useContext(AuthContext);
   const bookId = Number.parseInt(id || '', 10);
   const requestedChapterValue = new URLSearchParams(location.search).get('chapter');
@@ -172,32 +170,37 @@ export default function BookViewPage() {
     params.set('chapter', String(chapterId));
     navigate({ search: params.toString() });
   };
+  const fontSizeIndex = READING_FONT_SIZES.indexOf(preferences.fontSize as typeof READING_FONT_SIZES[number]);
+  const adjustFontSize = (direction: -1 | 1) => {
+    const nextSize = READING_FONT_SIZES[fontSizeIndex + direction];
+    if (nextSize) setPreferences(current => ({ ...current, fontSize: nextSize }));
+  };
+  const hasNextChapter = activeChapterIndex >= 0 && activeChapterIndex < bookData.chapters.length - 1;
   const backgroundStyle: CSSProperties = preferences.background === 'custom' && preferences.customImage
     ? { backgroundImage: `url(${preferences.customImage})`, backgroundSize: 'cover', backgroundAttachment: 'fixed' }
     : {};
-  const backgroundClass: Record<ReadingBackground, string> = { paper: 'bg-[#f8f5ef]', mist: 'bg-slate-100', ink: 'bg-stone-800', green: 'bg-emerald-50', custom: 'bg-[#f8f5ef]' };
 
   return (
-    <div style={backgroundStyle} className={`min-h-screen ${isDark ? 'bg-stone-950 text-stone-100' : `${backgroundClass[preferences.background]} text-stone-800`}`}>
-      <div className={`border-b px-4 py-4 sm:px-6 lg:px-12 ${isDark ? 'border-stone-800' : 'border-amber-100/80'}`}>
-        <SiteHeader beforeNavigation={<button onClick={() => navigate('/classical-library')} className="text-stone-500 transition hover:text-amber-800">← 返回文库</button>} />
+    <div style={backgroundStyle} className={`reading-page reading-theme-${preferences.background} min-h-screen`}>
+      <div className="reading-header border-b px-4 py-4 sm:px-6 lg:px-12">
+        <SiteHeader beforeNavigation={<button onClick={() => navigate('/classical-library')} className="reading-muted transition hover:opacity-75">← 返回文库</button>} />
       </div>
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <div className="mb-7 text-center">
-          <h1 className="font-serif text-3xl font-bold text-amber-900">{bookData.title}</h1>
-          {bookData.author.trim() && <p className="mt-2 text-stone-500">作者：{bookData.author}</p>}
-          {bookData.chapter && <p className="mt-3 font-serif text-xl text-amber-800">{bookData.chapter.title}</p>}
+          <h1 className="reading-accent font-serif text-3xl font-bold">{bookData.title}</h1>
+          {bookData.author.trim() && <p className="reading-muted mt-2">作者：{bookData.author}</p>}
+          {bookData.chapter && <p className="reading-accent mt-3 font-serif text-xl">{bookData.chapter.title}</p>}
         </div>
 
         {bookData.chapters.length > 0 && bookData.chapter && (
-          <section className={`mb-7 rounded-xl border p-4 shadow-sm ${isDark ? 'border-stone-700 bg-stone-900' : 'border-amber-200 bg-white'}`} aria-label="回目切换">
+          <section className="reading-card mb-7 rounded-xl border p-4 shadow-sm" aria-label="回目切换">
             <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center sm:justify-center">
               <button
                 type="button"
                 disabled={activeChapterIndex <= 0}
                 onClick={() => changeChapter(bookData.chapters[activeChapterIndex - 1].id)}
-                className="rounded-lg border border-amber-300 px-4 py-2 text-amber-800 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="reading-button rounded-lg border px-4 py-2 transition disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <i className="fa-solid fa-chevron-left mr-2" />上一回
               </button>
@@ -206,7 +209,7 @@ export default function BookViewPage() {
                 id="chapter-select"
                 value={bookData.chapter.id}
                 onChange={event => changeChapter(Number(event.target.value))}
-                className={`order-first col-span-2 w-full rounded-lg border border-amber-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 sm:order-none sm:w-auto sm:min-w-[20rem] ${isDark ? 'bg-stone-800 text-stone-100' : 'bg-amber-50/60 text-stone-800'}`}
+                className="reading-control order-first col-span-2 w-full rounded-lg border px-4 py-2.5 focus:outline-none focus:ring-2 sm:order-none sm:w-auto sm:min-w-[20rem]"
               >
                 {bookData.chapters.map(chapter => (
                   <option key={chapter.id} value={chapter.id}>{chapter.title}</option>
@@ -216,14 +219,14 @@ export default function BookViewPage() {
                 type="button"
                 disabled={activeChapterIndex < 0 || activeChapterIndex >= bookData.chapters.length - 1}
                 onClick={() => changeChapter(bookData.chapters[activeChapterIndex + 1].id)}
-                className="rounded-lg border border-amber-300 px-4 py-2 text-amber-800 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="reading-button rounded-lg border px-4 py-2 transition disabled:cursor-not-allowed disabled:opacity-40"
               >
                 下一回<i className="fa-solid fa-chevron-right ml-2" />
               </button>
             </div>
             {bookData.chapter.summary && (
-              <p className="mx-auto mt-4 max-w-4xl border-t border-amber-100 pt-4 text-sm leading-7 text-stone-500">
-                <span className="font-medium text-amber-800">本回梗概：</span>{bookData.chapter.summary}
+              <p className="reading-divider reading-muted mx-auto mt-4 max-w-4xl border-t pt-4 text-sm leading-7">
+                <span className="reading-accent font-medium">本回梗概：</span>{bookData.chapter.summary}
               </p>
             )}
           </section>
@@ -242,10 +245,19 @@ export default function BookViewPage() {
         </div>
 
         {readingActive ? (
-          <section className={`rounded-xl border p-5 shadow-lg sm:p-8 ${isDark ? 'border-stone-800 bg-stone-900' : 'border-stone-100 bg-white'}`}>
+          <section className="reading-card rounded-xl border p-5 shadow-lg sm:p-8">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-              <h2 className="font-serif text-xl font-semibold text-amber-900">文本阅读</h2>
-              <div className="flex items-center gap-3 text-sm text-stone-400"><span>共 {bookData.annotations.length} 条注释</span><label>字号 <select value={preferences.fontSize} onChange={e => setPreferences(p => ({ ...p, fontSize: Number(e.target.value) }))} className="rounded border border-amber-200 px-1 py-1 text-stone-700"><option value="16">小</option><option value="18">标准</option><option value="20">大</option><option value="24">特大</option></select></label><label>背景 <select value={preferences.background} onChange={e => setPreferences(p => ({ ...p, background: e.target.value as ReadingBackground }))} className="rounded border border-amber-200 px-1 py-1 text-stone-700"><option value="paper">宣纸</option><option value="mist">雾灰</option><option value="green">青绿</option><option value="ink">墨色</option><option value="custom">本地图片</option></select></label><label className="cursor-pointer text-amber-700">选图<input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setPreferences(p => ({ ...p, background: 'custom', customImage: String(reader.result) })); reader.readAsDataURL(file); }} /></label></div>
+              <h2 className="reading-accent font-serif text-xl font-semibold">文本阅读</h2>
+              <div className="reading-muted flex flex-wrap items-center gap-3 text-sm">
+                <span>共 {bookData.annotations.length} 条注释</span>
+                <div className="reading-control inline-flex items-center overflow-hidden rounded-lg border" aria-label={`当前字号 ${preferences.fontSize} 像素`}>
+                  <button type="button" aria-label="减小字号" disabled={fontSizeIndex <= 0} onClick={() => adjustFontSize(-1)} className="reading-step-button px-3 py-1 font-bold disabled:cursor-not-allowed disabled:opacity-35">−</button>
+                  <span className="min-w-14 border-x px-2 py-1 text-center tabular-nums">{preferences.fontSize}px</span>
+                  <button type="button" aria-label="增大字号" disabled={fontSizeIndex >= READING_FONT_SIZES.length - 1} onClick={() => adjustFontSize(1)} className="reading-step-button px-3 py-1 font-bold disabled:cursor-not-allowed disabled:opacity-35">+</button>
+                </div>
+                <label>背景 <select value={preferences.background} onChange={e => setPreferences(p => ({ ...p, background: e.target.value as ReadingBackground }))} className="reading-control rounded border px-2 py-1"><option value="paper">宣纸</option><option value="mist">雾灰</option><option value="green">青绿</option><option value="ink">墨色</option><option value="custom">本地图片</option></select></label>
+                <label className="reading-accent cursor-pointer">选图<input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setPreferences(p => ({ ...p, background: 'custom', customImage: String(reader.result) })); reader.readAsDataURL(file); }} /></label>
+              </div>
             </div>
             <div className="mb-6 flex flex-wrap gap-3">
               <button onClick={() => setActiveTab('original')} className={`rounded-lg border px-5 py-2 ${activeTab === 'original' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-stone-200 hover:bg-stone-50'}`}>原文</button>
@@ -254,7 +266,7 @@ export default function BookViewPage() {
             </div>
 
             {activeTab === 'translation' ? (
-              <div style={{ fontSize: `${preferences.fontSize}px` }} className="min-h-[320px] break-words rounded-lg border border-stone-100 bg-[#fffefa]/90 p-4 font-serif leading-8 sm:min-h-[420px] sm:p-6 sm:leading-9">
+              <div style={{ fontSize: `${preferences.fontSize}px` }} className="reading-paper min-h-[320px] break-words rounded-lg border p-4 font-serif leading-8 sm:min-h-[420px] sm:p-6 sm:leading-9">
                 {translationLoading ? '正在生成译文…' : translation ? (editingField === 'translation' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : <div className="whitespace-pre-wrap">{indentLines(translation)}</div>) : (
                   <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 text-stone-400">
                     <i className="fa-regular fa-file-lines text-3xl" />
@@ -266,7 +278,7 @@ export default function BookViewPage() {
               </div>
             ) : (
               <>
-                <article style={{ fontSize: `${preferences.fontSize}px` }} className="min-h-[320px] whitespace-pre-wrap break-words rounded-lg border border-stone-100 bg-[#fffefa]/90 p-4 font-serif leading-8 sm:min-h-[420px] sm:p-8 sm:leading-9">
+                <article style={{ fontSize: `${preferences.fontSize}px` }} className="reading-paper min-h-[320px] whitespace-pre-wrap break-words rounded-lg border p-4 font-serif leading-8 sm:min-h-[420px] sm:p-8 sm:leading-9">
                   {editingField === 'original' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : renderText(bookData.content, activeTab === 'annotated')}
                 </article>
                 {isAdmin && activeTab !== 'annotated' && <div className="mt-4 flex gap-3"><button type="button" onClick={() => editingField === 'original' ? void saveEdit() : beginEdit('original')} disabled={savingContent} className="rounded-lg bg-amber-700 px-4 py-2 text-sm text-white">{editingField === 'original' ? (savingContent ? '保存中…' : '保存') : '编辑'}</button>{editingField === 'original' && <button type="button" onClick={() => setEditingField(null)} className="rounded-lg border border-stone-300 px-4 py-2 text-sm">取消</button>}</div>}
@@ -288,6 +300,13 @@ export default function BookViewPage() {
                 <p className="mt-4 text-sm text-stone-400"><span className="sm:hidden">提示：手机端可在正文下方的注释列表集中查看释义。</span><span className="hidden sm:inline">提示：悬停或聚焦注释序号即可查看释义。</span></p>
               </>
             )}
+            {hasNextChapter && (
+              <div className="mt-8 flex justify-end border-t border-current/10 pt-6">
+                <button type="button" onClick={() => changeChapter(bookData.chapters[activeChapterIndex + 1].id)} className="reading-button rounded-lg border px-5 py-2.5 text-sm font-medium transition">
+                  下一回：{bookData.chapters[activeChapterIndex + 1].title}<i className="fa-solid fa-chevron-right ml-2" />
+                </button>
+              </div>
+            )}
           </section>
         ) : activeTab === 'knowledge' ? (
           <KnowledgeGraphView bookId={bookId} />
@@ -307,7 +326,7 @@ export default function BookViewPage() {
         )}
       </main>
 
-      <footer className="border-t border-amber-100 py-6 text-center text-sm text-stone-400">© 2025 文心新述 · 古典小说智能改编平台</footer>
+      <footer className="reading-header reading-muted border-t py-6 text-center text-sm">© 2025 文心新述 · 古典小说智能改编平台</footer>
     </div>
   );
 }

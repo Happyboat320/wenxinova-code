@@ -37,7 +37,33 @@ interface WorkspaceCache {
   selectedCharacter: string;
   generatedCharacters: Character[];
   result: string;
+  adaptationReport: string;
   continuationRequirement: string;
+}
+
+const ADAPTATION_MARKER = '<<<ADAPTATION>>>';
+const REPORT_MARKER = '<<<REPORT>>>';
+
+/** 将同一次流式响应中的改编正文和报告拆开；长文本分块时允许标记重复出现。 */
+function splitAdaptationResponse(raw: string): { content: string; report: string } {
+  const sections: Record<'content' | 'report', string[]> = { content: [], report: [] };
+  const markerPattern = /<<<(ADAPTATION|REPORT)>>>/g;
+  let active: 'content' | 'report' = 'content';
+  let cursor = 0;
+  let matched = false;
+  for (const marker of raw.matchAll(markerPattern)) {
+    matched = true;
+    const text = raw.slice(cursor, marker.index).trim();
+    if (text) sections[active].push(text);
+    active = marker[1] === 'REPORT' ? 'report' : 'content';
+    cursor = (marker.index || 0) + marker[0].length;
+  }
+  const tail = raw.slice(cursor).replace(/\n?<{1,3}[A-Z_]*$/, '').trim();
+  if (tail) sections[active].push(tail);
+  return {
+    content: (matched ? sections.content : [raw]).join('\n\n').trim(),
+    report: sections.report.join('\n\n').trim(),
+  };
 }
 
 function readCache(key: string): Partial<WorkspaceCache> | null {
@@ -70,6 +96,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
   const [generatedCharacters, setGeneratedCharacters] = useState<Character[]>([]);
   const [analyzingCharacters, setAnalyzingCharacters] = useState(false);
   const [result, setResult] = useState('');
+  const [adaptationReport, setAdaptationReport] = useState('');
   const [loading, setLoading] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [continuationDialogOpen, setContinuationDialogOpen] = useState(false);
@@ -112,7 +139,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
   const request = useMemo(() => {
     if (mode === 'style') {
       const extra = styleRequirement.trim() ? `\n补充要求：${styleRequirement.trim()}` : '';
-      return { type: 'adapt' as const, prompt: `请将作品改编为“${style}”风格。保留核心人物关系与主要情节，使语言、节奏和氛围符合该类型。${extra}` };
+      return { type: 'adapt' as const, prompt: `请将作品改编为“${style}”风格。保留核心人物关系与主要情节，使语言、节奏和氛围符合该类型。${extra}\n\n请一次性生成改编正文和改编报告，并严格使用以下纯文本标记分隔，不要改写、遗漏标记：\n${ADAPTATION_MARKER}\n（完整改编正文）\n${REPORT_MARKER}\n（改编报告，说明风格策略、情节与人物处理、语言和节奏变化、保留及创新之处）` };
     }
     if (scriptSection === 'role') {
       return { type: 'script' as const, prompt: selectedCharacter };
@@ -155,6 +182,7 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
         setDraftId(draft?.id);
         // 本地内容可能比服务端草稿更新，优先恢复用户离开页面前的编辑现场。
         setResult(typeof cached?.result === 'string' ? cached.result : draft?.content || '');
+        setAdaptationReport(typeof cached?.adaptationReport === 'string' ? cached.adaptationReport : '');
         if (typeof cached?.style === 'string' && styles.includes(cached.style)) setStyle(cached.style);
         if (typeof cached?.styleRequirement === 'string') setStyleRequirement(cached.styleRequirement);
         if (typeof cached?.selectedCharacter === 'string') setSelectedCharacter(cached.selectedCharacter);
@@ -174,9 +202,9 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
   useEffect(() => {
     // 分类切换的首帧不能把空白状态误写到目标分类缓存。
     if (hydratedCacheKey !== cacheKey) return;
-    const state: WorkspaceCache = { style, styleRequirement, selectedCharacter, generatedCharacters, result, continuationRequirement };
+    const state: WorkspaceCache = { style, styleRequirement, selectedCharacter, generatedCharacters, result, adaptationReport, continuationRequirement };
     try { localStorage.setItem(cacheKey, JSON.stringify(state)); } catch { /* 内容过大或隐私模式下静默降级。 */ }
-  }, [cacheKey, continuationRequirement, generatedCharacters, hydratedCacheKey, result, selectedCharacter, style, styleRequirement]);
+  }, [adaptationReport, cacheKey, continuationRequirement, generatedCharacters, hydratedCacheKey, result, selectedCharacter, style, styleRequirement]);
 
   const generate = async () => {
     if (!user) {
@@ -194,11 +222,22 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
       streamControllerRef.current = controller;
       setLoading(true);
       setResult('');
+      if (mode === 'style') setAdaptationReport('');
+      let rawResponse = '';
       await api.adaptBookStream(
         sourceText,
         request.type,
         request.prompt,
-        content => setResult(current => current + content),
+        content => {
+          if (mode !== 'style') {
+            setResult(current => current + content);
+            return;
+          }
+          rawResponse += content;
+          const separated = splitAdaptationResponse(rawResponse);
+          setResult(separated.content);
+          setAdaptationReport(separated.report);
+        },
         controller.signal,
       );
     } catch (caught) {
@@ -402,8 +441,8 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
           <p className="mt-1 text-gray-500">{mode === 'style' ? `作者：${author}` : '将经典名著改编为互动剧本杀体验'}</p>
         )}
         <div className="mt-5 inline-flex rounded-lg border border-amber-200 bg-white p-1">
-          <button className={`rounded-md px-5 py-2 ${mode === 'style' ? 'bg-amber-700 text-white' : 'text-amber-800'}`} onClick={() => { setMode('style'); setResult(''); }}>风格化改编</button>
-          <button className={`rounded-md px-5 py-2 ${mode === 'script' ? 'bg-amber-700 text-white' : 'text-amber-800'}`} onClick={() => { setMode('script'); setResult(''); }}>剧本杀创作</button>
+          <button className={`rounded-md px-5 py-2 ${mode === 'style' ? 'bg-amber-700 text-white' : 'text-amber-800'}`} onClick={() => { setMode('style'); setResult(''); setAdaptationReport(''); }}>风格化改编</button>
+          <button className={`rounded-md px-5 py-2 ${mode === 'script' ? 'bg-amber-700 text-white' : 'text-amber-800'}`} onClick={() => { setMode('script'); setResult(''); setAdaptationReport(''); }}>剧本杀创作</button>
         </div>
       </div>
 
@@ -418,6 +457,8 @@ export default function AdaptWorkspace({ bookId, chapterId, title, author, origi
             onChange={setResult}
             loading={loading}
             onGenerate={generate}
+            report={adaptationReport}
+            onReportChange={setAdaptationReport}
             continuation={{
               loading: continuing,
               onFree: () => void continueWriting(),
@@ -555,7 +596,7 @@ function OriginalPanel({ className, text, sourceMode, loading, disabled, onSourc
   );
 }
 
-function OutputPanel({ className, title, result, onChange, loading, onGenerate, continuation }: {
+function OutputPanel({ className, title, result, onChange, loading, onGenerate, continuation, report, onReportChange }: {
   className: string;
   title: string;
   result: string;
@@ -563,30 +604,40 @@ function OutputPanel({ className, title, result, onChange, loading, onGenerate, 
   loading: boolean;
   onGenerate: () => void;
   continuation?: { loading: boolean; onFree: () => void; onCustom: () => void };
+  report?: string;
+  onReportChange?: (value: string) => void;
 }) {
   const [preview, setPreview] = useState(false);
   const [continuationMenuOpen, setContinuationMenuOpen] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const displayedText = showReport ? report || '' : result;
+  const changeDisplayedText = showReport ? onReportChange : onChange;
 
   return (
     <section className={`${className} min-w-0 p-4 sm:p-6`}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-xl font-medium"><i className="fa-solid fa-pen-to-square mr-2 text-amber-700" />{title}</h3>
+        <h3 className="text-xl font-medium"><i className={`fa-solid ${showReport ? 'fa-clipboard-list' : 'fa-pen-to-square'} mr-2 text-amber-700`} />{showReport ? '改编报告' : title}</h3>
         <div className="flex items-center gap-2">
+          {report !== undefined && (
+            <button type="button" disabled={loading && !report} onClick={() => { setShowReport(current => !current); setPreview(false); }} className="btn-secondary whitespace-nowrap disabled:opacity-50">
+              <i className={`fa-solid ${showReport ? 'fa-arrow-left' : 'fa-clipboard-list'} mr-2`} />{showReport ? '返回改编内容' : '查看改编报告'}
+            </button>
+          )}
           <div className="inline-flex rounded-lg border border-amber-200 bg-amber-50 p-1 text-sm">
             <button onClick={() => setPreview(false)} className={`rounded-md px-3 py-1.5 ${!preview ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>编辑</button>
             <button onClick={() => setPreview(true)} className={`rounded-md px-3 py-1.5 ${preview ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>预览</button>
           </div>
-          <button onClick={onGenerate} disabled={loading} className="btn-secondary disabled:opacity-50"><i className="fa-solid fa-wand-magic-sparkles mr-2" />{loading ? '生成中...' : '生成内容'}</button>
+          {!showReport && <button onClick={onGenerate} disabled={loading} className="btn-secondary disabled:opacity-50"><i className="fa-solid fa-wand-magic-sparkles mr-2" />{loading ? '生成中...' : '生成内容'}</button>}
         </div>
       </div>
       {preview ? (
         <div className="h-[55dvh] min-h-80 overflow-y-auto break-words rounded-lg border border-gray-200 p-4 sm:h-[620px] sm:p-5">
-          {result.trim() ? <MarkdownContent content={result} /> : <p className="text-gray-400">生成内容后可在这里预览 Markdown 排版效果。</p>}
+          {displayedText.trim() ? <MarkdownContent content={displayedText} /> : <p className="text-gray-400">{showReport && loading ? 'AI 正在生成改编报告…' : '生成内容后可在这里预览 Markdown 排版效果。'}</p>}
         </div>
       ) : (
-        <textarea value={result} onChange={event => onChange(event.target.value)} className="h-[55dvh] min-h-80 w-full resize-none rounded-lg border border-gray-200 p-4 leading-8 focus:outline-none focus:ring-2 focus:ring-amber-400 sm:h-[620px] sm:p-5" placeholder={loading ? 'AI 正在创作，请稍候…' : '生成的内容将显示在这里，生成后可以继续编辑…'} />
+        <textarea value={displayedText} onChange={event => changeDisplayedText?.(event.target.value)} className="h-[55dvh] min-h-80 w-full resize-none rounded-lg border border-gray-200 p-4 leading-8 focus:outline-none focus:ring-2 focus:ring-amber-400 sm:h-[620px] sm:p-5" placeholder={loading ? (showReport ? 'AI 正在生成改编报告…' : 'AI 正在创作，请稍候…') : showReport ? '生成后的改编报告将单独显示在这里…' : '生成的内容将显示在这里，生成后可以继续编辑…'} />
       )}
-      {continuation && (
+      {continuation && !showReport && (
         <div className="relative mt-4 flex justify-center">
           <button
             type="button"
