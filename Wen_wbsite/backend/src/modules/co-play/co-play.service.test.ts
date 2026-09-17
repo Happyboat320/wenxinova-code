@@ -167,6 +167,38 @@ describe('数字共演角色收藏', () => {
       [expect.objectContaining({ characterName: '林黛玉', content: '花谢花飞花满天。' })],
     );
   });
+
+  it.each([
+    ['sangu', '刘备'],
+    ['water-margin', '鲁智深'],
+    ['journey', '孙悟空'],
+  ] as const)('%s 参与发言只路由到对应主题（%s）', async (scene, characterName) => {
+    favoriteCharacterMock.findFirst.mockResolvedValue({
+      id: 8,
+      userId: 2,
+      name: '任氏',
+      description: '重情守义',
+      deeds: '新写入的灵魂与记忆',
+      sourceTitle: '任氏传',
+      sourceChapterTitle: null,
+    });
+    vi.mocked(deepseek.generateJinlingParticipationOptions).mockResolvedValue([
+      { playerLine: '在下有一言。', replies: [{ characterName, content: '请讲。' }, { characterName, content: '有理。' }] },
+      { playerLine: '且听在下一言。', replies: [{ characterName, content: '请讲。' }, { characterName, content: '有理。' }] },
+    ]);
+
+    await createJinlingParticipationOptions(2, {
+      favoriteCharacterId: 8,
+      scene,
+      context: [{ role: 'character', characterName, content: '当前场景台词。' }],
+    });
+
+    expect(deepseek.generateJinlingParticipationOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '任氏' }),
+      [expect.objectContaining({ characterName, content: '当前场景台词。' })],
+      scene,
+    );
+  });
 });
 
 describe('数字共演作品保存', () => {

@@ -8,7 +8,7 @@ const CONTENT_SEP = '###CONTENT_START###';
 
 // 风格化改编专用协议：前端据此渲染核心修改，普通正文展示时会移除全部控制符和理由。
 const ADAPTATION_HIGHLIGHT_SYSTEM = `你是一位专业的文学改编专家，擅长根据用户需求对文学作品进行风格、叙事方式的改编。保持核心情节和人物关系。
-在改编正文中，只标记相较待处理内容发生实质变化的核心片段，例如关键情节重构、人物动机调整、叙事视角转换或具有代表性的风格化改写。不要标记普通润色、标点变化或整篇正文。
+在改编正文中，充分标记相较待处理内容发生实质变化的片段，例如关键情节重构、人物动机调整、叙事视角转换、场景重塑、代表性语言变化或风格化改写。改编篇幅在 1500 字以内时尽量标记 6-10 处，超过 1500 字时尽量每 300-500 字标记 1-2 处；不要标记纯标点变化，也不要把整篇正文一次性标记。
 每处核心修改必须严格使用以下格式，三个控制符不得改写、嵌套或放入改编报告：
 <<<CORE_CHANGE>>>实际出现在改编正文中的片段<<<CHANGE_REASON>>>不超过40字的具体修改理由<<<END_CORE_CHANGE>>>
 除上述格式外，不要另列修改清单；正文去除控制符和理由后必须仍然完整、连贯。`;
@@ -402,6 +402,21 @@ export async function translateToModernChinese(originalText: string): Promise<st
     temperature: 0.45,
     max_tokens: 3200,
     model: DEEPSEEK_TRANSLATE_MODEL,
+  });
+}
+
+/** 翻译内容按模型增量直接下发，供阅读页边生成边展示。 */
+export function translateToModernChineseStream(
+  originalText: string,
+  onDelta: (content: string) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const system = '你是一位严谨的古典文学翻译家，请将古典中文翻译为现代白话中文。要求精准传达原文含义与语气，保持自然流畅。';
+  return processLongTextStream(system, `请将以下古文翻译为现代汉语：\n\n${CONTENT_SEP}${originalText}`, onDelta, {
+    temperature: 0.45,
+    max_tokens: 3200,
+    model: DEEPSEEK_TRANSLATE_MODEL,
+    signal,
   });
 }
 
@@ -934,7 +949,7 @@ ${history.length ? history.map(message => `${message.role === 'user' ? '用户' 
 
 function parseJinlingParticipationOptions(raw: string, expectedNames: string[] = ['林黛玉', '贾宝玉']): JinlingParticipationOption[] {
   const value = parseJsonObject(raw) as { options?: unknown };
-  if (!Array.isArray(value.options)) throw new Error('黛玉葬花参与返回缺少 options');
+  if (!Array.isArray(value.options)) throw new Error('共演参与返回缺少 options');
   const expected = new Set(expectedNames);
   const options = value.options.map(item => {
     const row = item as { playerLine?: unknown; replies?: unknown };
@@ -953,7 +968,7 @@ function parseJinlingParticipationOptions(raw: string, expectedNames: string[] =
     };
   }).filter(option => option.playerLine && option.replies.length === 2).slice(0, 2);
 
-  if (options.length !== 2) throw new Error('黛玉葬花参与候选数量不完整');
+  if (options.length !== 2) throw new Error('共演参与候选数量不完整');
   return options.map(option => ({
     playerLine: option.playerLine,
     replies: option.replies.map(reply => ({
@@ -966,11 +981,12 @@ function parseJinlingParticipationOptions(raw: string, expectedNames: string[] =
 export async function generateJinlingParticipationOptions(
   character: CoPlayCharacterPrompt,
   context: CoPlayHistoryMessage[],
-  scene: 'jinling' | 'sangu' | 'water-margin' = 'jinling',
+  scene: 'jinling' | 'sangu' | 'water-margin' | 'journey' = 'jinling',
 ): Promise<JinlingParticipationOption[]> {
   const sangu = scene === 'sangu';
   const waterMargin = scene === 'water-margin';
-  const expectedNames = sangu ? ['刘备', '诸葛亮', '关羽', '张飞'] : waterMargin ? ['鲁智深', '林冲', '张三', '李四'] : ['林黛玉', '贾宝玉'];
+  const journey = scene === 'journey';
+  const expectedNames = sangu ? ['刘备', '诸葛亮', '关羽', '张飞'] : waterMargin ? ['鲁智深', '林冲', '张三', '李四'] : journey ? ['孙悟空', '铁扇公主', '猪八戒', '牛魔王'] : ['林黛玉', '贾宝玉'];
   if (AI_MOCK_MODE) {
     if (sangu) return [
       { playerLine: '皇叔三顾之诚，足令山川动容。', replies: [{ characterName: '刘备', content: '足下此言，愈教备不敢懈怠。' }, { characterName: '诸葛亮', content: '求贤以诚，亮已尽见。' }] },
@@ -980,10 +996,23 @@ export async function generateJinlingParticipationOptions(
       { playerLine: '师傅这等神力，俺愿在菜园里替你看守。', replies: [{ characterName: '鲁智深', content: '有这份心便好，少做恶事才是真。' }, { characterName: '林冲', content: '二位若能守义相助，实是难得。' }] },
       { playerLine: '倒拔垂杨柳之后，还请师傅指点枪棒。', replies: [{ characterName: '鲁智深', content: '指点谈不上，先把拳脚练扎实。' }, { characterName: '林冲', content: '师傅所言极是，练武贵在持久。' }] },
     ];
+    if (journey) return [
+      { playerLine: '大圣且慢，借扇为过山，莫把旧怨越结越深。', replies: [{ characterName: '孙悟空', content: '老孙只求路通，扇用过自然奉还。' }, { characterName: '铁扇公主', content: '说得轻巧，我儿之怨又该如何算？' }] },
+      { playerLine: '既是镇山宝物，不如当面立约，灭火之后即刻归还。', replies: [{ characterName: '牛魔王', content: '若真能说到做到，我便听这一句。' }, { characterName: '猪八戒', content: '立约便立约，先救我师父过山要紧。' }] },
+    ];
     return parseJinlingParticipationOptions(getMockResponse('黛玉葬花参与 options'));
   }
 
-  const prompt = `${sangu ? '三顾茅庐' : waterMargin ? '倒拔垂杨柳' : '黛玉葬花'}参与生成任务。用户将以一个收藏角色插入${sangu ? '《三国演义》“三顾茅庐”的刘备、诸葛亮、关羽、张飞对话' : waterMargin ? '《水浒传》“倒拔垂杨柳”的鲁智深、林冲、张三、李四对话' : '《红楼梦》“潇湘馆・黛玉葬花”的宝黛对话'}。
+  const sceneTitle = sangu ? '三顾茅庐' : waterMargin ? '倒拔垂杨柳' : journey ? '三借芭蕉扇' : '黛玉葬花';
+  const sceneDescription = sangu ? '《三国演义》“三顾茅庐”的刘备、诸葛亮、关羽、张飞对话' : waterMargin ? '《水浒传》“倒拔垂杨柳”的鲁智深、林冲、张三、李四对话' : journey ? '《西游记》“三借芭蕉扇”的孙悟空、铁扇公主、猪八戒、牛魔王对话' : '《红楼梦》“潇湘馆・黛玉葬花”的宝黛对话';
+  const decisionBoundary = sangu
+    ? '不要替刘备、诸葛亮、关羽或张飞决定是否出山或如何行动'
+    : waterMargin
+      ? '不要替鲁智深、林冲、张三或李四决定如何行动'
+      : journey
+        ? '不要替孙悟空、铁扇公主、猪八戒或牛魔王决定借扇、还扇或罢战'
+        : '不要替林黛玉或贾宝玉作决定';
+  const prompt = `${sceneTitle}参与生成任务。用户将以一个收藏角色插入${sceneDescription}。
 
 参与角色：
 名字：${character.name}
@@ -994,22 +1023,24 @@ export async function generateJinlingParticipationOptions(
 当前剧情上下文：
 ${context.length ? context.map(message => `${message.characterName || '旁白'}：${message.content}`).join('\n') : '剧情刚开始'}
 
-请生成两个可供用户选择的参与角色发言候选，并为每个候选生成${sangu || waterMargin ? '在当前上下文中最相关的两位原场景人物' : '林黛玉和贾宝玉'}的即时回应。原场景人物只能从${expectedNames.join('、')}中选择。
+请生成两个可供用户选择的参与角色发言候选，并为每个候选生成${sangu || waterMargin || journey ? '在当前上下文中最相关的两位原场景人物' : '林黛玉和贾宝玉'}的即时回应。原场景人物只能从${expectedNames.join('、')}中选择。
 要求：
 1. playerLine 必须严格符合参与角色的人物属性、经历和语言气质。
 2. 原场景人物的回应必须围绕 playerLine 改写，不沿用原固定台词。
-3. 回应要贴合“${sangu ? '三顾茅庐' : waterMargin ? '倒拔垂杨柳' : '黛玉葬花'}”的情境、人物关系和各自语气。
-4. 不要让参与角色替黛玉或宝玉作决定；不要跳出现代说明。
-5. 每句不超过 80 个汉字。
+3. 回应要贴合“${sceneTitle}”的情境、人物关系和各自语气。
+4. 只能围绕当前“${sceneTitle}”场景，不得混入其他三个共演主题的人物、地点、事件或意象。
+5. ${decisionBoundary}；不要跳出现代说明。
+6. 每句不超过 70 个汉字，语言直接凝练。
+7. options 数组必须恰好有 2 项，每项 replies 必须恰好有 2 项。
 
 只输出合法 JSON，不使用 Markdown。格式：
-{"options":[{"playerLine":"参与角色发言","replies":[{"characterName":"${expectedNames[0]}","content":"人物回应"},{"characterName":"${expectedNames[1]}","content":"人物回应"}]}]}`;
+{"options":[{"playerLine":"候选发言一","replies":[{"characterName":"${expectedNames[0]}","content":"人物回应"},{"characterName":"${expectedNames[1]}","content":"人物回应"}]},{"playerLine":"候选发言二","replies":[{"characterName":"${expectedNames[1]}","content":"人物回应"},{"characterName":"${expectedNames[0]}","content":"人物回应"}]}]}`;
 
   return callStructuredJson([
     { role: 'system', content: '你是古典文学互动剧情导演，擅长让外部角色自然插入经典名著场景，并保持所有人物语气一致。输出必须是机器可解析 JSON。' },
     { role: 'user', content: prompt },
-  ], raw => parseJinlingParticipationOptions(raw, expectedNames), `${sangu ? '三顾茅庐' : '黛玉葬花'}参与`, {
-    temperature: 0.78,
-    max_tokens: 1600,
+  ], raw => parseJinlingParticipationOptions(raw, expectedNames), `${sceneTitle}参与`, {
+    temperature: 0.68,
+    max_tokens: 900,
   });
 }

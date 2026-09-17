@@ -18,5 +18,11 @@ describe('本地费用保护限流', () => {
     consumeLimit('phone:13800000000', 1, 60_000);
     expect(() => consumeLimit('phone:13900000000', 1, 60_000)).not.toThrow();
   });
-});
 
+  it('改编配额允许十分钟内 30 次，第 31 次被拒绝', () => {
+    for (let index = 0; index < 30; index += 1) {
+      expect(() => consumeLimit('adapt:user:1', 30, 10 * 60_000)).not.toThrow();
+    }
+    expect(() => consumeLimit('adapt:user:1', 30, 10 * 60_000)).toThrow('请求过于频繁');
+  });
+});

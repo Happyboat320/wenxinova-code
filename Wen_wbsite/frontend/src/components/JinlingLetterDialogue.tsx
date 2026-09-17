@@ -30,7 +30,7 @@ type JinlingLetterDialogueProps = {
   lines?: JinlingDialogueLine[];
   tones?: Record<string, PlotSpeakerTone>;
   portraits?: PlotPortrait[];
-  participationScene?: 'jinling' | 'sangu' | 'water-margin';
+  participationScene?: 'jinling' | 'sangu' | 'water-margin' | 'journey';
 };
 
 type DialogueDisplayLine = {
@@ -346,6 +346,8 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
               src={tone.portrait}
               alt={tone.role}
               draggable={false}
+              decoding="async"
+              loading="eager"
               onError={() => setPortraitFailed(current => ({ ...current, [speaker]: true }))}
               className={`max-h-full max-w-full select-none object-contain drop-shadow-2xl ${
                 align === 'left' ? 'origin-bottom-left' : 'origin-bottom-right'

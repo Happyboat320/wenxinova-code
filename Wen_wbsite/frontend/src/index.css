@@ -1096,6 +1096,7 @@ body {
 .kg-person-action:disabled{cursor:wait;opacity:.62}
 .kg-person-node:hover .kg-person-circle,.kg-person-node:focus-within .kg-person-circle{animation:kg-person-glimmer 1.15s ease-in-out infinite;stroke-width:2.6px}
 .kg-person-node:hover .kg-person-action-wrap,.kg-person-node:focus-within .kg-person-action-wrap{opacity:1;pointer-events:auto;transform:translateY(0)}
+@media(max-width:639px){.kg-person-action-wrap{opacity:1;pointer-events:auto;transform:translateY(0)}}
 @keyframes kg-person-turn{to{transform:rotate(360deg)}}
 @keyframes kg-person-glimmer{0%,100%{filter:drop-shadow(0 0 1px rgba(180,83,9,.18));transform:scale(1)}50%{filter:drop-shadow(0 0 7px rgba(217,119,6,.48));transform:scale(1.025)}}
 @media (prefers-reduced-motion:reduce){.kg-person-orbit{animation:none}.kg-person-node:hover .kg-person-circle,.kg-person-node:focus-within .kg-person-circle{animation:none;filter:drop-shadow(0 0 5px rgba(217,119,6,.35))}}
@@ -1112,7 +1113,7 @@ body {
 }
 .sangu-portrait img{
   width:auto!important;
-  height:100%!important;
+  height:var(--portrait-height,100%)!important;
   max-width:none!important;
   max-height:none!important;
   transform:translateX(var(--portrait-shift,0));
@@ -1131,6 +1132,25 @@ body {
 .portrait-lu-zhishen{--portrait-shift:14%}
 .portrait-lin-chong{--portrait-shift:-1%}
 .portrait-li-si{--portrait-shift:-9%}
+.portrait-zhu-bajie{--portrait-shift:2%}
+.portrait-sun-wukong{--portrait-shift:1%}
+.portrait-tieshan{--portrait-shift:-1%}
+.portrait-niu-mowang{--portrait-shift:-2%}
+
+@media(min-width:640px){
+  /* 群雄逐鹿：刘备、诸葛亮同时收小，并按原图有效人物高度校准到近似等高。 */
+  .portrait-liu-bei{--portrait-height:88%}
+  .portrait-zhuge-liang{--portrait-height:90%}
+
+  /* 义聚梁山：张三、李四落脚更低，且明确矮于前排的鲁智深、林冲。 */
+  .sangu-portrait-guard-left.portrait-zhang-san,
+  .sangu-portrait-guard-right.portrait-li-si{top:20%!important;bottom:0!important}
+  .portrait-zhang-san,.portrait-li-si{--portrait-height:90%}
+
+  /* 灵山问道：孙悟空保持高挑，铁扇公主适当收小，形成清楚的身高差。 */
+  .portrait-sun-wukong{--portrait-height:100%}
+  .portrait-tieshan{--portrait-height:91%}
+}
 
 @media(max-width:639px){
   .sangu-portrait{top:auto!important;width:50%!important;height:40%!important}

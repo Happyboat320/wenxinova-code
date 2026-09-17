@@ -361,11 +361,49 @@ export async function getTranslation(id: number, chapterId?: number): Promise<st
   return translation;
 }
 
-// 流式获取书籍译文 (保留兼容性)
-export async function streamTranslation(id: number, res: any, chapterId?: number) {
-  const translation = await getTranslation(id, chapterId);
-  res.write(translation);
-  res.end();
+// 流式生成译文；只有模型完整结束后才写入缓存，避免保存半截译文。
+export async function streamTranslation(
+  id: number,
+  onDelta: (content: string) => void,
+  chapterId?: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  const book = await prisma.book.findUnique({
+    where: { id },
+    select: {
+      originalText: true,
+      translatedText: true,
+      chapters: {
+        select: { id: true, order: true, originalText: true, translatedText: true },
+        orderBy: { order: 'asc' },
+      },
+    },
+  });
+  const chapter = chapterId === undefined ? book?.chapters[0] : book?.chapters.find(item => item.id === chapterId);
+  if (chapterId !== undefined && !chapter) throw new Error('回目不存在或不属于当前作品');
+  const originalText = chapter?.originalText || book?.originalText;
+  const cachedTranslation = chapter?.translatedText || book?.translatedText;
+  if (!book || !originalText) throw new Error('书籍原文不存在');
+
+  if (cachedTranslation) {
+    onDelta(cachedTranslation);
+    return;
+  }
+
+  let translation = '';
+  await deepseek.translateToModernChineseStream(originalText, content => {
+    translation += content;
+    onDelta(content);
+  }, signal);
+  const completedTranslation = translation.trim();
+  if (!completedTranslation) throw new Error('译文生成结果为空');
+
+  if (chapter) {
+    await prisma.bookChapter.update({ where: { id: chapter.id }, data: { translatedText: completedTranslation } });
+    if (chapter.order === 1) await prisma.book.update({ where: { id }, data: { translatedText: completedTranslation } });
+  } else {
+    await prisma.book.update({ where: { id }, data: { translatedText: completedTranslation } });
+  }
 }
 
 // 管理员覆盖文库内容，并把修改前后的完整文本写入审计表。

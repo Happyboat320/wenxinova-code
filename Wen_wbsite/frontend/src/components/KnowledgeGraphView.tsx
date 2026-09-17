@@ -130,9 +130,9 @@ function RelationshipGraph({ data, joiningName, joinedNames, onJoin }: {
     return [node.id, { x: width / 2 + Math.cos(angle) * radius, y: height / 2 + Math.sin(angle) * radius }];
   })), [data.nodes]);
   return <div>
-    {/* 图形在手机端会因缩小而难以辨认，因此窄屏直接使用下方的语义化关系列表。 */}
-    <div className="hidden rounded-xl border border-amber-100 bg-[#fffdf8] sm:block">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label="人物关系图">
+    {/* 手机端保留原始可读尺寸并允许横向滚动，避免把人物与关系文字压得过小。 */}
+    <div className="overflow-x-auto rounded-xl border border-amber-100 bg-[#fffdf8] overscroll-x-contain">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto min-w-[760px] w-full" role="img" aria-label="人物关系图">
         <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#a16207" /></marker></defs>
         {data.edges.map((edge, index) => {
           const source = positions.get(edge.source); const target = positions.get(edge.target);

@@ -32,10 +32,12 @@ interface Props {
 type WorkspaceMode = 'style' | 'script';
 type ScriptSection = 'role' | 'tasks';
 type SourceMode = 'original' | 'translation';
+type GenerationLength = 'concise' | 'standard' | 'long';
 
 interface WorkspaceCache {
   style: string;
   styleRequirement: string;
+  generationLength: GenerationLength;
   selectedCharacter: string;
   generatedCharacters: Character[];
   result: string;
@@ -47,7 +49,7 @@ const ADAPTATION_MARKER = '<<<ADAPTATION>>>';
 const REPORT_MARKER = '<<<REPORT>>>';
 
 /** 将同一次流式响应中的改编正文和报告拆开；长文本分块时允许标记重复出现。 */
-function splitAdaptationResponse(raw: string): { content: string; report: string } {
+export function splitAdaptationResponse(raw: string): { content: string; report: string } {
   const sections: Record<'content' | 'report', string[]> = { content: [], report: [] };
   const markerPattern = /<<<(ADAPTATION|REPORT)>>>/g;
   let active: 'content' | 'report' = 'content';
@@ -64,7 +66,8 @@ function splitAdaptationResponse(raw: string): { content: string; report: string
   if (tail) sections[active].push(tail);
   return {
     content: (matched ? sections.content : [raw]).join('\n\n').trim(),
-    report: sections.report.join('\n\n').trim(),
+    // 报告不参与高亮协议，统一清除模型偶尔附带在末尾的控制标记。
+    report: sections.report.join('\n\n').replace(/<<<[A-Z_]+>>>/g, '').replace(/\n?<+\s*$/, '').trim(),
   };
 }
 
@@ -114,7 +117,13 @@ function paginatePlayerText(text: string, pageSize = 1800): string[] {
 
 const styles = [
   '浪漫言情', '恐怖悬疑', '武侠江湖', '侦探推理', '科幻幻想',
-  '幽默诙谐', '讽刺批判', '奇幻冒险', '温馨治愈', '官场职场', '仙侠修真',
+  '幽默诙谐', '讽刺批判', '奇幻冒险', '温馨治愈', '官场职场', '仙侠修真', '自定义风格',
+];
+
+const generationLengths: Array<{ value: GenerationLength; label: string; prompt: string }> = [
+  { value: 'concise', label: '精简', prompt: '生成精简篇幅，正文约 800 字，尽量控制在 650-950 字。' },
+  { value: 'standard', label: '标准', prompt: '生成标准篇幅，正文约 1500 字，尽量控制在 1200-1800 字。' },
+  { value: 'long', label: '长篇', prompt: '生成长篇内容，正文约 3000 字，尽量控制在 2600-3400 字。' },
 ];
 
 const cluePrompt = (characterName: string) => `请基于原文和已经生成的人物剧本，为剧本杀角色【${characterName}】生成配套“线索”。
@@ -139,6 +148,7 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
   const [mode, setMode] = useState<WorkspaceMode>(initialMode);
   const [style, setStyle] = useState(styles[0]);
   const [styleRequirement, setStyleRequirement] = useState('');
+  const [generationLength, setGenerationLength] = useState<GenerationLength>('standard');
   const [scriptSection, setScriptSection] = useState<ScriptSection>(initialScriptSection);
   const [selectedCharacter, setSelectedCharacter] = useState(characters[0]?.name || '主角');
   const [result, setResult] = useState('');
@@ -163,14 +173,18 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
 
   const request = useMemo(() => {
     if (mode === 'style') {
-      const extra = styleRequirement.trim() ? `\n补充要求：${styleRequirement.trim()}` : '';
-      return { type: 'adapt' as const, prompt: `请将作品改编为“${style}”风格。保留核心人物关系与主要情节，使语言、节奏和氛围符合该类型。${extra}\n\n请一次性生成改编正文和改编报告，并严格使用以下纯文本标记分隔，不要改写、遗漏标记：\n${ADAPTATION_MARKER}\n（完整改编正文）\n${REPORT_MARKER}\n（改编报告，说明风格策略、情节与人物处理、语言和节奏变化、保留及创新之处）` };
+      const requirement = styleRequirement.trim();
+      const stylePrompt = style === '自定义风格'
+        ? `请严格按照用户写出的自定义风格要求改编，不要套用预设类型。\n自定义风格要求：${requirement || '用户尚未填写'}`
+        : `请将作品改编为“${style}”风格。保留核心人物关系与主要情节，使语言、节奏和氛围符合该类型。${requirement ? `\n补充要求：${requirement}` : ''}`;
+      const lengthPrompt = generationLengths.find(item => item.value === generationLength)?.prompt || generationLengths[1].prompt;
+      return { type: 'adapt' as const, prompt: `${stylePrompt}\n${lengthPrompt}\n\n请一次性生成改编正文和改编报告，并严格使用以下纯文本标记分隔，不要改写、遗漏标记，报告结束后不要输出任何标记：\n${ADAPTATION_MARKER}\n（完整改编正文）\n${REPORT_MARKER}\n（改编报告，说明风格策略、情节与人物处理、语言和节奏变化、保留及创新之处）` };
     }
     if (scriptSection === 'role') {
       return { type: 'script' as const, prompt: selectedCharacter };
     }
     return { type: 'script-tasks' as const, prompt: cluePrompt(selectedCharacter) };
-  }, [mode, scriptSection, selectedCharacter, style, styleRequirement]);
+  }, [generationLength, mode, scriptSection, selectedCharacter, style, styleRequirement]);
 
   // 保存独立分类，避免社区再根据可变的提示词内容猜测类型。
   const creationCategory: api.CreationCategory = mode === 'style'
@@ -211,6 +225,7 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
         setAdaptationReport(typeof cached?.adaptationReport === 'string' ? cached.adaptationReport : '');
         if (typeof cached?.style === 'string' && styles.includes(cached.style)) setStyle(cached.style);
         if (typeof cached?.styleRequirement === 'string') setStyleRequirement(cached.styleRequirement);
+        if (cached?.generationLength && generationLengths.some(item => item.value === cached.generationLength)) setGenerationLength(cached.generationLength);
         if (typeof cached?.selectedCharacter === 'string') setSelectedCharacter(cached.selectedCharacter);
         if (typeof cached?.continuationRequirement === 'string') setContinuationRequirement(cached.continuationRequirement);
         setPersistedVersion(draft ? { status: draft.status, content: draft.content } : null);
@@ -227,9 +242,9 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
   useEffect(() => {
     // 分类切换的首帧不能把空白状态误写到目标分类缓存。
     if (hydratedCacheKey !== cacheKey) return;
-    const state: WorkspaceCache = { style, styleRequirement, selectedCharacter, generatedCharacters: [], result, adaptationReport, continuationRequirement };
+    const state: WorkspaceCache = { style, styleRequirement, generationLength, selectedCharacter, generatedCharacters: [], result, adaptationReport, continuationRequirement };
     try { localStorage.setItem(cacheKey, JSON.stringify(state)); } catch { /* 内容过大或隐私模式下静默降级。 */ }
-  }, [adaptationReport, cacheKey, continuationRequirement, hydratedCacheKey, result, selectedCharacter, style, styleRequirement]);
+  }, [adaptationReport, cacheKey, continuationRequirement, generationLength, hydratedCacheKey, result, selectedCharacter, style, styleRequirement]);
 
   const generate = async () => {
     if (!user) {
@@ -239,6 +254,10 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
     }
     if (!sourceText.trim()) {
       toast.error(`当前作品没有可用于改编的${sourceMode === 'translation' ? '译文' : '原文'}`);
+      return;
+    }
+    if (mode === 'style' && style === '自定义风格' && !styleRequirement.trim()) {
+      toast.error('选择自定义风格后，请先填写风格要求');
       return;
     }
     try {
@@ -375,7 +394,7 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
 
   const panel = 'rounded-xl border border-amber-100 bg-white text-gray-800 shadow-lg';
   const outputTitle = mode === 'style'
-    ? `${style}风格改编`
+    ? style === '自定义风格' ? '自定义风格改编' : `${style}风格改编`
     : scriptSection === 'role' ? `${selectedCharacter} · 分幕剧本` : `${selectedCharacter} · 线索`;
   const cleanResult = stripAdaptationMarkup(result).trim();
   const contentUnchanged = persistedVersion?.content === cleanResult;
@@ -403,8 +422,12 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
           <section className={`${panel} min-w-0 p-6`}>
             <h3 className="mb-4 text-xl font-medium"><i className="fa-solid fa-palette mr-2 text-amber-700" />风格选项</h3>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">{styles.map(item => <button key={item} onClick={() => setStyle(item)} className={`rounded-lg border px-4 py-2.5 text-left transition ${style === item ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-transparent hover:bg-amber-50'}`}>{item}</button>)}</div>
-            <label className="mt-5 block text-sm text-gray-600">补充要求（可选）</label>
-            <textarea value={styleRequirement} onChange={event => setStyleRequirement(event.target.value)} className="mt-2 w-full resize-none rounded-lg border border-amber-200 p-3 focus:outline-none focus:ring-2 focus:ring-amber-400" rows={4} placeholder="例如：使用第一人称，控制在 1500 字内" />
+            <label className="mt-5 block text-sm text-gray-600">生成长度</label>
+            <div className="mt-2 grid grid-cols-3 gap-2" aria-label="选择生成长度">
+              {generationLengths.map(item => <button type="button" key={item.value} onClick={() => setGenerationLength(item.value)} className={`rounded-lg border px-2 py-2 text-sm transition ${generationLength === item.value ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-amber-100 hover:bg-amber-50'}`}>{item.label}</button>)}
+            </div>
+            <label className="mt-5 block text-sm text-gray-600">{style === '自定义风格' ? '自定义风格要求（必填）' : '补充要求（可选）'}</label>
+            <textarea value={styleRequirement} onChange={event => setStyleRequirement(event.target.value)} className="mt-2 w-full resize-none rounded-lg border border-amber-200 p-3 focus:outline-none focus:ring-2 focus:ring-amber-400" rows={4} placeholder={style === '自定义风格' ? '例如：仿黑色电影旁白，短句推进，冷峻克制' : '例如：使用第一人称，加强人物心理描写'} />
           </section>
           <OutputPanel
             className={panel}
@@ -545,7 +568,7 @@ function OriginalPanel({ className, text, sourceMode, loading, disabled, onSourc
         </div></div>
       </div>
       {!collapsed && <div className="h-[45dvh] min-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-amber-200 p-4 font-serif text-base leading-8 sm:h-[420px] sm:p-5 sm:text-lg">
-        {loading && sourceMode === 'translation' ? '正在加载译文…' : text || `暂无${sourceMode === 'translation' ? '译文' : '原文'}`}
+        {text || (loading && sourceMode === 'translation' ? '正在加载译文…' : `暂无${sourceMode === 'translation' ? '译文' : '原文'}`)}
       </div>}
     </section>
   );

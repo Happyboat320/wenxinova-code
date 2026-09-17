@@ -5,10 +5,10 @@ import { useTheme } from '@/hooks/useTheme';
 import JinlingLetterDialogue, { type JinlingLetterDialogueHandle } from '@/components/JinlingLetterDialogue';
 import SanguPlotDialogue from '@/components/SanguPlotDialogue';
 import WaterMarginPlotDialogue from '@/components/WaterMarginPlotDialogue';
+import JourneyPlotDialogue from '@/components/JourneyPlotDialogue';
 import SiteHeader from '@/components/SiteHeader';
 import * as api from '@/api';
 
-const MAX_CHARACTERS = 10;
 type CoPlayPanel = 'dialogue' | 'theater' | 'characters';
 
 const characterSourceLabel = (character: api.FavoriteCharacter) => (
@@ -72,17 +72,21 @@ const scenePresets = [
   },
 ];
 
+const journeyPortraitSources = ['孙悟空', '铁扇公主', '猪八戒', '牛魔王']
+  .map(name => `/digital-coplay-characters/${name}.webp`);
+
 export default function DigitalCoPlayPage() {
   const { isDark } = useTheme();
   const { user, isInitializing, openLogin } = useContext(AuthContext);
   const jinlingLetterRef = useRef<JinlingLetterDialogueHandle>(null);
   const sanguPlotRef = useRef<JinlingLetterDialogueHandle>(null);
   const waterMarginPlotRef = useRef<JinlingLetterDialogueHandle>(null);
+  const journeyPlotRef = useRef<JinlingLetterDialogueHandle>(null);
   const theaterScrollRef = useRef<HTMLDivElement>(null);
   const [activePanel, setActivePanel] = useState<CoPlayPanel>('dialogue');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [favorites, setFavorites] = useState<api.FavoriteCharacter[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [comingSoonOpen, setComingSoonOpen] = useState(false);
   const [activeScenePresetName, setActiveScenePresetName] = useState(scenePresets[0].name);
   const [activeFavoriteId, setActiveFavoriteId] = useState<number | null>(null);
   const [soulMemoryInput, setSoulMemoryInput] = useState('');
@@ -107,6 +111,16 @@ export default function DigitalCoPlayPage() {
     const frame = window.requestAnimationFrame(centerTheater);
     return () => window.cancelAnimationFrame(frame);
   }, [activeScenePresetName, activePanel]);
+
+  useEffect(() => {
+    if (activeScenePresetName !== '西游记') return;
+    // 进入灵山问道后即预取人物，避免点击火焰山标记时才同时请求四张图。
+    journeyPortraitSources.forEach(src => {
+      const portrait = new Image();
+      portrait.decoding = 'async';
+      portrait.src = src;
+    });
+  }, [activeScenePresetName]);
 
   const activeFavorite = useMemo(
     () => favorites.find(character => character.id === activeFavoriteId) || favorites[0] || null,
@@ -146,22 +160,10 @@ export default function DigitalCoPlayPage() {
     void load();
   }, [user]);
 
-  const toggleSelected = (id: number) => {
-    setSelectedIds(current => {
-      if (current.includes(id)) return current.filter(item => item !== id);
-      if (current.length >= MAX_CHARACTERS) {
-        toast.error(`最多选择 ${MAX_CHARACTERS} 个角色`);
-        return current;
-      }
-      return [...current, id];
-    });
-  };
-
   const removeFavorite = async (id: number) => {
     try {
       await api.removeFavoriteCharacter(id);
       setFavorites(current => current.filter(character => character.id !== id));
-      setSelectedIds(current => current.filter(item => item !== id));
       if (activeFavoriteId === id) {
         const nextFavorite = favorites.find(character => character.id !== id) || null;
         setActiveFavoriteId(nextFavorite?.id || null);
@@ -266,7 +268,7 @@ export default function DigitalCoPlayPage() {
 
   const sidebarItems: Array<{ key: CoPlayPanel; label: string; icon: string; summary: string }> = [
     { key: 'dialogue', label: '对话', icon: 'fa-comments', summary: activeChatFavorite ? activeChatFavorite.name : '角色聊天' },
-    { key: 'theater', label: '数字共演剧场', icon: 'fa-masks-theater', summary: `${selectedIds.length}/${MAX_CHARACTERS} 个角色` },
+    { key: 'theater', label: '数字共演剧场', icon: 'fa-masks-theater', summary: '4 个经典栏目' },
     { key: 'characters', label: '角色设定', icon: 'fa-user-gear', summary: `${favorites.length} 个收藏角色` },
   ];
 
@@ -427,6 +429,26 @@ export default function DigitalCoPlayPage() {
               1
             </button>
           )}
+          {activeScenePreset.name === '西游记' && (
+            <button
+              type="button"
+              onClick={() => journeyPlotRef.current?.init()}
+              className="absolute left-[58%] top-[35%] z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-100/90 bg-stone-950/55 text-lg font-semibold text-amber-50 shadow-lg shadow-stone-950/30 outline-none backdrop-blur transition hover:scale-105 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-2 focus-visible:ring-amber-100"
+              aria-label="打开标号1火焰山三借芭蕉扇剧情"
+              title="火焰山・三借芭蕉扇"
+            >
+              1
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setComingSoonOpen(true)}
+            className="absolute left-[72%] top-[62%] z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-100/90 bg-stone-950/55 text-lg font-semibold text-amber-50 shadow-lg shadow-stone-950/30 outline-none backdrop-blur transition hover:scale-105 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-2 focus-visible:ring-amber-100"
+            aria-label={`打开标号2${activeScenePreset.name}后续剧情`}
+            title="未完待续"
+          >
+            2
+          </button>
         </div>
       </div>
 
@@ -483,6 +505,22 @@ export default function DigitalCoPlayPage() {
           onComplete={() => toast.success('剧情结束')}
         />
       )}
+      {activeScenePreset.name === '西游记' && (
+        <JourneyPlotDialogue
+          ref={journeyPlotRef}
+          favorites={favorites}
+          onComplete={() => toast.success('剧情结束')}
+        />
+      )}
+      {comingSoonOpen && (
+        <div className="absolute inset-0 z-40 grid place-items-center bg-stone-950/45 p-5" onMouseDown={() => setComingSoonOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-label="后续剧情提示" className="w-full max-w-sm rounded-2xl border border-amber-100 bg-[#fffaf0] p-8 text-center shadow-2xl" onMouseDown={event => event.stopPropagation()}>
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-100 text-xl text-amber-800"><i className="fa-solid fa-hourglass-half" /></div>
+            <p className="mt-5 font-serif text-2xl font-semibold text-amber-950">未完待续</p>
+            <button type="button" onClick={() => setComingSoonOpen(false)} className="btn-primary mt-6 min-w-28">知道了</button>
+          </div>
+        </div>
+      )}
     </section>
   );
 
@@ -494,7 +532,6 @@ export default function DigitalCoPlayPage() {
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-amber-700">Characters</p>
             <h2 className="mt-1 text-2xl font-semibold text-amber-950">角色设定</h2>
           </div>
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-sm text-amber-800">{selectedIds.length}/{MAX_CHARACTERS}</span>
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
@@ -522,16 +559,13 @@ export default function DigitalCoPlayPage() {
                     <span key={tag} className="rounded-full bg-white px-2 py-0.5 text-xs text-amber-800 ring-1 ring-amber-200">{tag}</span>
                   ))}
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-4">
                   <button
                     type="button"
                     onClick={() => editFavorite(character)}
                     className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-200 text-amber-800 hover:bg-white'}`}
                   >
                     更改属性
-                  </button>
-                  <button type="button" onClick={() => toggleSelected(character.id)} className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${selectedIds.includes(character.id) ? 'border-stone-300 bg-white text-stone-600' : 'border-amber-200 text-amber-800 hover:bg-white'}`}>
-                    {selectedIds.includes(character.id) ? '移出剧场' : '加入剧场'}
                   </button>
                 </div>
               </article>

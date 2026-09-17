@@ -22,15 +22,19 @@ export function consumeLimit(key: string, max: number, windowMs: number): number
 
 const activeAiRequests = new Map<number, number>();
 
-export function aiUsageGuard(req: Request, res: Response, next: NextFunction): void {
+function guardAiRequest(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  consumeQuota: (userId: number) => void,
+): void {
   const userId = req.auth!.userId;
   try {
-    consumeLimit(`ai:user:${userId}`, 20, 60 * 60 * 1000);
-    consumeLimit(`ai:ip:${req.ip}`, 40, 60 * 60 * 1000);
+    consumeQuota(userId);
   } catch (caught) {
     const retryAfter = Number((caught as { retryAfter?: number }).retryAfter || 60);
     res.setHeader('Retry-After', retryAfter);
-    res.status(429).json(error('AI 调用过于频繁，请稍后重试', 429));
+    res.status(429).json(error('请求过于频繁，请稍后再试', 429));
     return;
   }
 
@@ -54,8 +58,21 @@ export function aiUsageGuard(req: Request, res: Response, next: NextFunction): v
   next();
 }
 
+export function aiUsageGuard(req: Request, res: Response, next: NextFunction): void {
+  guardAiRequest(req, res, next, userId => {
+    consumeLimit(`ai:user:${userId}`, 20, 60 * 60 * 1000);
+    consumeLimit(`ai:ip:${req.ip}`, 40, 60 * 60 * 1000);
+  });
+}
+
+/** 改编和剧本杀共用独立配额，避免其他 AI 功能挤占创作次数。 */
+export function adaptationUsageGuard(req: Request, res: Response, next: NextFunction): void {
+  guardAiRequest(req, res, next, userId => {
+    consumeLimit(`adapt:user:${userId}`, 30, 10 * 60 * 1000);
+  });
+}
+
 export function resetRateLimitsForTests(): void {
   buckets.clear();
   activeAiRequests.clear();
 }
-

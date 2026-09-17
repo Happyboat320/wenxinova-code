@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import * as api from '@/api';
@@ -42,6 +42,7 @@ export default function BookViewPage() {
   const [activeTab, setActiveTab] = useState<PageTab>('original');
   const [translation, setTranslation] = useState('');
   const [translationLoading, setTranslationLoading] = useState(false);
+  const translationControllerRef = useRef<AbortController | null>(null);
   const [editingField, setEditingField] = useState<'original' | 'translation' | null>(null);
   const [draftContent, setDraftContent] = useState('');
   const [savingContent, setSavingContent] = useState(false);
@@ -58,6 +59,9 @@ export default function BookViewPage() {
   useEffect(() => { if (bookData && bookData.annotations.length === 0 && activeTab === 'annotated') setActiveTab('original'); }, [activeTab, bookData]);
 
   useEffect(() => {
+    translationControllerRef.current?.abort();
+    translationControllerRef.current = null;
+    setTranslationLoading(false);
     const load = async () => {
       if (!Number.isInteger(bookId) || bookId <= 0) {
         setError('无效的书籍编号');
@@ -80,6 +84,8 @@ export default function BookViewPage() {
     void load();
   }, [bookId, requestedChapterId]);
 
+  useEffect(() => () => translationControllerRef.current?.abort(), []);
+
   const annotationsByIndex = useMemo(
     () => new Map(bookData?.annotations.map(annotation => [annotation.index, annotation.content]) || []),
     [bookData?.annotations],
@@ -92,16 +98,32 @@ export default function BookViewPage() {
       openLogin();
       return false;
     }
+    let controller: AbortController | null = null;
     try {
+      translationControllerRef.current?.abort();
+      controller = new AbortController();
+      translationControllerRef.current = controller;
       setTranslationLoading(true);
-      const content = await api.getBookTranslation(bookId, bookData?.chapter?.id);
-      setTranslation(content);
+      setTranslation('');
+      await api.getBookTranslationStream(
+        bookId,
+        bookData?.chapter?.id,
+        content => setTranslation(current => current + content),
+        controller.signal,
+      );
       return true;
     } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : '加载译文失败');
+      if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
+        setTranslation('');
+        toast.error(caught instanceof Error ? caught.message : '加载译文失败');
+      }
       return false;
     } finally {
-      setTranslationLoading(false);
+      // 仅允许当前请求收尾，避免旧请求覆盖新回目的加载状态。
+      if (translationControllerRef.current === controller) {
+        translationControllerRef.current = null;
+        setTranslationLoading(false);
+      }
     }
   };
 
@@ -289,7 +311,7 @@ export default function BookViewPage() {
 
             {activeTab === 'translation' ? (
               <div style={{ fontSize: `${preferences.fontSize}px` }} className="reading-paper min-h-[320px] break-words rounded-lg border p-4 font-serif leading-8 sm:min-h-[420px] sm:p-6 sm:leading-9">
-                {translationLoading ? '正在生成译文…' : translation ? (editingField === 'translation' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : <div className="whitespace-pre-wrap">{indentLines(translation)}</div>) : (
+                {translation ? (editingField === 'translation' ? <textarea value={draftContent} onChange={event => setDraftContent(event.target.value)} className="min-h-[360px] w-full resize-y rounded border border-amber-300 bg-transparent p-3 font-serif leading-8 outline-none" /> : <><div className="whitespace-pre-wrap">{indentLines(translation)}</div>{translationLoading && <p className="mt-4 text-sm text-amber-700"><i className="fa-solid fa-spinner fa-spin mr-2" />译文生成中…</p>}</>) : translationLoading ? '正在生成译文…' : (
                   <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 text-stone-400">
                     <i className="fa-regular fa-file-lines text-3xl" />
                     <p>{user ? '点击“译文”加载内容' : '登录后可查看译文'}</p>

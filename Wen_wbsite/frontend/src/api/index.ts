@@ -284,6 +284,70 @@ export async function getBookTranslation(id: number, chapterId?: number): Promis
   return unwrap(response.data, '获取译文失败').translation;
 }
 
+/** 读取 SSE 译文流；与改编流保持同一鉴权续期与错误处理语义。 */
+export async function getBookTranslationStream(
+  id: number,
+  chapterId: number | undefined,
+  onDelta: (content: string) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const url = `${baseURL.replace(/\/$/, '')}/books/${id}/translation/stream`;
+  const request = (token: string | null) => fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ chapterId }),
+    signal,
+  });
+
+  let response = await request(accessToken);
+  if (response.status === 401) {
+    try {
+      const session = await requestRefresh();
+      response = await request(session.accessToken);
+    } catch {
+      setAccessToken(null);
+      authFailureHandler?.();
+      throw new Error('登录状态已失效，请重新登录');
+    }
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as ApiResponse<unknown> | null;
+    throw new Error(body?.message || `译文请求失败（HTTP ${response.status}）`);
+  }
+  if (!response.body) throw new Error('当前浏览器不支持流式响应');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let completed = false;
+  const consumeEvent = (rawEvent: string) => {
+    const lines = rawEvent.split('\n');
+    const event = lines.find(line => line.startsWith('event:'))?.slice(6).trim() || 'message';
+    const data = lines.filter(line => line.startsWith('data:')).map(line => line.slice(5).trim()).join('\n');
+    if (!data) return;
+    const payload = JSON.parse(data) as { content?: string; message?: string };
+    if (event === 'delta' && payload.content) onDelta(payload.content);
+    if (event === 'done') completed = true;
+    if (event === 'error') throw new Error(payload.message || '译文生成失败');
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, '\n');
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+    for (const event of events) consumeEvent(event);
+    if (done) break;
+  }
+  if (buffer.trim()) consumeEvent(buffer);
+  if (!completed) throw new Error('译文生成连接意外中断，请稍后重试');
+}
+
 // 管理员保存当前单篇/回目的原文或已生成译文。
 export async function updateBookContent(id: number, data: { chapterId?: number; field: 'original' | 'translation'; content: string }): Promise<string> {
   const response = await client.patch<ApiResponse<{ content: string }>>(`/books/${id}/content`, data);
@@ -598,7 +662,7 @@ export async function chatWithFavoriteCharacter(id: number, data: {
 
 export async function generateJinlingParticipationOptions(data: {
   favoriteCharacterId: number;
-  scene?: 'jinling' | 'sangu' | 'water-margin';
+  scene?: 'jinling' | 'sangu' | 'water-margin' | 'journey';
   context: Array<{ role: 'character' | 'system'; characterName: string | null; content: string }>;
 }): Promise<{ character: { id: number; name: string }; options: JinlingParticipationOption[] }> {
   const response = await client.post<ApiResponse<{ character: { id: number; name: string }; options: JinlingParticipationOption[] }>>(

@@ -96,7 +96,7 @@ coPlayRouter.post('/jinling-letter/participation-options', requireAuth, aiUsageG
     if (result.kind === 'missing') return res.status(404).json(error('收藏角色不存在', 404));
     res.json(success(result.data, '参与发言已生成'));
   } catch (caught) {
-    console.error('生成黛玉葬花参与发言失败:', caught);
+    console.error('生成共演剧情参与发言失败:', caught);
     res.status(500).json(error(caught instanceof Error ? caught.message : '生成参与发言失败'));
   }
 });

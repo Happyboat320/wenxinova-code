@@ -107,7 +107,41 @@ bookRouter.get('/:id/content', async (req: Request, res: Response) => {
   }
 });
 
-// 获取书籍译文
+// 流式获取书籍译文，关闭 Nginx 缓冲后浏览器可实时看到新增文本。
+bookRouter.post('/:id/translation/stream', requireAuth, aiUsageGuard, async (req: Request, res: Response) => {
+  const bookId = Number(req.params.id);
+  const chapterId = req.body?.chapterId === undefined ? undefined : Number(req.body.chapterId);
+  if (!Number.isInteger(bookId) || bookId <= 0 || (chapterId !== undefined && (!Number.isInteger(chapterId) || chapterId <= 0))) {
+    res.status(400).json(error('无效的书籍或回目ID', 400));
+    return;
+  }
+
+  const controller = new AbortController();
+  res.once('close', () => { if (!res.writableEnded) controller.abort(); });
+  res.status(200);
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+  const send = (event: string, data: unknown) => {
+    if (!res.writableEnded && !res.destroyed) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    await bookService.streamTranslation(bookId, content => send('delta', { content }), chapterId, controller.signal);
+    send('done', {});
+  } catch (caught) {
+    if (!controller.signal.aborted) {
+      console.error('流式获取书籍译文失败:', caught);
+      send('error', { message: caught instanceof Error ? caught.message : '获取书籍译文失败' });
+    }
+  } finally {
+    if (!res.writableEnded && !res.destroyed) res.end();
+  }
+});
+
+// 保留普通译文接口，兼容尚未升级的客户端。
 bookRouter.post('/:id/translation', requireAuth, aiUsageGuard, async (req: Request, res: Response) => {
   const bookId = parseInt(req.params.id);
 

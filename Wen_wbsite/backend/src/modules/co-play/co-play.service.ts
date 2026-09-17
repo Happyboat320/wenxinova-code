@@ -202,17 +202,20 @@ export async function createJinlingParticipationOptions(userId: number, input: {
 
   const participant = {
     name: favorite.name,
-    description: favorite.description,
-    deeds: favorite.deeds,
-    sourceTitle: favorite.sourceChapterTitle
+    // 参与发言只需人物核心设定；限制提示词长度可显著减少生成等待。
+    description: cleanText(favorite.description, 300) || null,
+    deeds: cleanText(favorite.deeds, 600) || null,
+    sourceTitle: cleanText(favorite.sourceChapterTitle
       ? `${favorite.sourceTitle || '未知文本'} · ${favorite.sourceChapterTitle}`
-      : favorite.sourceTitle,
+      : favorite.sourceTitle, 120) || null,
   };
   // 保持原“梦断金陵”调用签名不变，其他经典剧情按各自场景生成参与回应。
   const options = input.scene === 'sangu'
     ? await generateJinlingParticipationOptions(participant, context, 'sangu')
     : input.scene === 'water-margin'
       ? await generateJinlingParticipationOptions(participant, context, 'water-margin')
+      : input.scene === 'journey'
+        ? await generateJinlingParticipationOptions(participant, context, 'journey')
       : await generateJinlingParticipationOptions(participant, context);
 
   return {
