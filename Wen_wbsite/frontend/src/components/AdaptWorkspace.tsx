@@ -4,6 +4,7 @@ import { AuthContext } from '@/contexts/authContext';
 import MarkdownContent from '@/components/MarkdownContent';
 import * as api from '@/api';
 import ScriptKillerWorkspace from '@/components/ScriptKillerWorkspace';
+import { parseAdaptationMarkup, stripAdaptationMarkup } from '@/lib/adaptationMarkup';
 
 interface Character {
   id: number;
@@ -290,7 +291,8 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
       openLogin();
       return;
     }
-    if (!result.trim()) {
+    const cleanResult = stripAdaptationMarkup(result);
+    if (!cleanResult.trim()) {
       toast.error('请先生成或输入需要续写的内容');
       return;
     }
@@ -304,7 +306,7 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
       setResult(`${existingResult}\n\n`);
       await api.adaptBookStream(
         // 仅传递末尾上下文，避免多次续写后请求体超限。
-        result.slice(-12000),
+        cleanResult.slice(-12000),
         'continue',
         requirement.trim() || '根据上文自由续写，保持文风和情节连贯',
         content => setResult(current => current + content),
@@ -327,7 +329,8 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
       openLogin();
       return;
     }
-    if (!result.trim()) return;
+    const cleanResult = stripAdaptationMarkup(result).trim();
+    if (!cleanResult) return;
     try {
       if (action === 'draft') setSaving(true);
       else setPublishing(true);
@@ -335,7 +338,8 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
         bookId,
         category: creationCategory,
         prompt: request.prompt,
-        content: result,
+        // 标记和理由只服务于当前创作页，不能进入草稿、社区或数据库。
+        content: cleanResult,
         action,
         draftId,
       });
@@ -357,8 +361,9 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
   };
 
   const exportResult = () => {
-    if (!result.trim()) return;
-    const exportText = mode === 'script' ? cleanPlayerText(result) : result;
+    const cleanResult = stripAdaptationMarkup(result);
+    if (!cleanResult.trim()) return;
+    const exportText = mode === 'script' ? cleanPlayerText(cleanResult) : cleanResult;
     const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -372,7 +377,8 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
   const outputTitle = mode === 'style'
     ? `${style}风格改编`
     : scriptSection === 'role' ? `${selectedCharacter} · 分幕剧本` : `${selectedCharacter} · 线索`;
-  const contentUnchanged = persistedVersion?.content === result.trim();
+  const cleanResult = stripAdaptationMarkup(result).trim();
+  const contentUnchanged = persistedVersion?.content === cleanResult;
 
   return (
     <div className="mx-auto max-w-[1440px]">
@@ -467,9 +473,9 @@ export default function AdaptWorkspace({ bookId, title, author, originalText, tr
       )}
 
       {mode === 'style' && <div className="mt-6 grid grid-cols-1 gap-3 sm:flex sm:justify-center sm:gap-4">
-        <button onClick={() => void persist('draft')} disabled={!result.trim() || saving || publishing || draftLoading || Boolean(contentUnchanged)} className="btn-secondary sm:min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-floppy-disk mr-2" />{saving ? '保存中...' : '保存'}</button>
-        <button onClick={() => void persist('publish')} disabled={!result.trim() || saving || publishing || draftLoading || ((persistedVersion?.status === 'published' || persistedVersion?.status === 'pending') && contentUnchanged)} className="btn-primary sm:min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-paper-plane mr-2" />{publishing ? '提交中...' : user?.role === 'admin' ? '发布' : '提交审核'}</button>
-        <button onClick={exportResult} disabled={!result.trim()} className="btn-secondary sm:min-w-40 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-download mr-2" />导出</button>
+        <button onClick={() => void persist('draft')} disabled={!cleanResult || saving || publishing || draftLoading || Boolean(contentUnchanged)} className="btn-secondary sm:min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-floppy-disk mr-2" />{saving ? '保存中...' : '保存'}</button>
+        <button onClick={() => void persist('publish')} disabled={!cleanResult || saving || publishing || draftLoading || ((persistedVersion?.status === 'published' || persistedVersion?.status === 'pending') && contentUnchanged)} className="btn-primary sm:min-w-36 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-paper-plane mr-2" />{publishing ? '提交中...' : user?.role === 'admin' ? '发布' : '提交审核'}</button>
+        <button onClick={exportResult} disabled={!cleanResult} className="btn-secondary sm:min-w-40 disabled:cursor-not-allowed disabled:opacity-40"><i className="fa-solid fa-download mr-2" />导出</button>
       </div>}
 
       {continuationDialogOpen && (
@@ -560,14 +566,22 @@ function OutputPanel({ className, title, result, onChange, loading, onGenerate, 
   const [preview, setPreview] = useState(false);
   const [continuationMenuOpen, setContinuationMenuOpen] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [readingPage, setReadingPage] = useState(0);
-  const displayedText = showReport ? report || '' : result;
+  const isAdaptation = report !== undefined;
+  const displayedText = showReport ? report || '' : isAdaptation ? stripAdaptationMarkup(result) : result;
   const changeDisplayedText = showReport ? onReportChange : onChange;
+  const adaptationSegments = useMemo(() => parseAdaptationMarkup(result), [result]);
+  const highlightedCount = adaptationSegments.filter(segment => segment.reason).length;
   const readingPages = useMemo(() => paginatePlayerText(displayedText), [displayedText]);
 
   useEffect(() => {
     setReadingPage(0);
   }, [displayedText, readingMode, showReport]);
+
+  useEffect(() => {
+    setSelectedReason(null);
+  }, [result, showReport]);
 
   return (
     <section className={`${className} min-w-0 p-4 sm:p-6`}>
@@ -580,8 +594,8 @@ function OutputPanel({ className, title, result, onChange, loading, onGenerate, 
             </button>
           )}
           <div className="inline-flex rounded-lg border border-amber-200 bg-amber-50 p-1 text-sm">
-            <button onClick={() => setPreview(false)} className={`rounded-md px-3 py-1.5 ${!preview ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>编辑</button>
-            <button onClick={() => setPreview(true)} className={`rounded-md px-3 py-1.5 ${preview ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>预览</button>
+            <button onClick={() => setPreview(false)} className={`rounded-md px-3 py-1.5 ${!preview ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>{isAdaptation && !showReport ? '原始显示' : '编辑'}</button>
+            <button onClick={() => setPreview(true)} className={`rounded-md px-3 py-1.5 ${preview ? 'bg-white text-amber-800 shadow-sm' : 'text-gray-600'}`}>{isAdaptation && !showReport ? '修改高亮' : '预览'}</button>
           </div>
           {!showReport && <button onClick={onGenerate} disabled={loading} className="btn-secondary disabled:opacity-50"><i className="fa-solid fa-wand-magic-sparkles mr-2" />{loading ? '生成中...' : '生成内容'}</button>}
         </div>
@@ -601,6 +615,36 @@ function OutputPanel({ className, title, result, onChange, loading, onGenerate, 
             </div>
           )}
         </>
+      ) : preview && isAdaptation && !showReport ? (
+        <div className="h-[55dvh] min-h-80 overflow-y-auto break-words rounded-lg border border-gray-200 p-4 sm:h-[620px] sm:p-5">
+          {displayedText.trim() ? (
+            <>
+              <div className="mb-4 flex items-center justify-between gap-3 text-sm text-gray-500">
+                <span><i className="fa-solid fa-highlighter mr-2 text-amber-600" />共标记 {highlightedCount} 处核心修改，点击高亮查看理由</span>
+              </div>
+              {selectedReason && (
+                <div role="status" className="sticky top-0 z-10 mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950 shadow-md">
+                  <div className="flex items-start justify-between gap-4">
+                    <p><strong className="mr-2">修改理由</strong>{selectedReason}</p>
+                    <button type="button" onClick={() => setSelectedReason(null)} aria-label="关闭修改理由" className="shrink-0 text-amber-800 hover:text-amber-950"><i className="fa-solid fa-xmark" /></button>
+                  </div>
+                </div>
+              )}
+              <div className="whitespace-pre-wrap font-serif text-base leading-8 text-gray-800 sm:text-lg">
+                {adaptationSegments.map((segment, index) => segment.reason ? (
+                  <button
+                    key={`${index}-${segment.text.slice(0, 12)}`}
+                    type="button"
+                    onClick={() => setSelectedReason(segment.reason || null)}
+                    className="rounded-sm bg-amber-200/80 px-0.5 text-left font-[inherit] text-[inherit] leading-[inherit] underline decoration-amber-600 decoration-dotted underline-offset-4 transition hover:bg-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    aria-label={`核心修改：${segment.text}。点击查看理由`}>
+                    {segment.text}
+                  </button>
+                ) : <span key={`${index}-${segment.text.slice(0, 12)}`}>{segment.text}</span>)}
+              </div>
+            </>
+          ) : <p className="text-gray-400">生成内容后可在这里查看核心修改。</p>}
+        </div>
       ) : preview ? (
         <div className="h-[55dvh] min-h-80 overflow-y-auto break-words rounded-lg border border-gray-200 p-4 sm:h-[620px] sm:p-5">
           {displayedText.trim() ? <MarkdownContent content={cleanPlayerText(displayedText)} /> : <p className="text-gray-400">{showReport && loading ? 'AI 正在生成改编报告…' : '生成内容后可在这里预览 Markdown 排版效果。'}</p>}

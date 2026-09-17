@@ -6,6 +6,13 @@ const AI_MOCK_MODE = process.env.AI_MOCK_MODE === 'true';
 
 const CONTENT_SEP = '###CONTENT_START###';
 
+// 风格化改编专用协议：前端据此渲染核心修改，普通正文展示时会移除全部控制符和理由。
+const ADAPTATION_HIGHLIGHT_SYSTEM = `你是一位专业的文学改编专家，擅长根据用户需求对文学作品进行风格、叙事方式的改编。保持核心情节和人物关系。
+在改编正文中，只标记相较待处理内容发生实质变化的核心片段，例如关键情节重构、人物动机调整、叙事视角转换或具有代表性的风格化改写。不要标记普通润色、标点变化或整篇正文。
+每处核心修改必须严格使用以下格式，三个控制符不得改写、嵌套或放入改编报告：
+<<<CORE_CHANGE>>>实际出现在改编正文中的片段<<<CHANGE_REASON>>>不超过40字的具体修改理由<<<END_CORE_CHANGE>>>
+除上述格式外，不要另列修改清单；正文去除控制符和理由后必须仍然完整、连贯。`;
+
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -138,7 +145,7 @@ function getMockResponse(prompt: string): string {
     return '【模拟译文】\n\n这是模拟生成的现代汉语译文，用于替代真实的 AI 翻译结果。';
   }
   if (prompt.includes('风格') || prompt.includes('改编')) {
-    return '【模拟改编结果】\n\n这是一段模拟的改编内容。';
+    return '<<<ADAPTATION>>>\n【模拟改编结果】\n\n这是一段<<<CORE_CHANGE>>>加入夜雨追逐情节<<<CHANGE_REASON>>>强化悬疑节奏<<<END_CORE_CHANGE>>>的模拟改编内容。\n<<<REPORT>>>\n通过核心情节调整强化所选风格。';
   }
   if (prompt.includes('创作') || prompt.includes('续写')) {
     return '【模拟创作结果】\n\n这是一段模拟的创作内容。';
@@ -405,7 +412,7 @@ const SCRIPT_OUTLINE_CREATION_SYSTEM = `你是资深剧本杀总编。把已锁�
 function scriptCreationSystem(prompt: string): string {
   if (prompt.includes('一次性生成完整') && prompt.includes('三幕故事大纲')) return SCRIPT_OUTLINE_CREATION_SYSTEM;
   if (prompt.includes('世界观') && /玩家|游戏场域|人文地理/.test(prompt)) return SCRIPT_WORLD_CREATION_SYSTEM;
-  return '你是一位专业的文学改编专家，擅长根据用户需求对文学作品进行风格、叙事方式的改编。保持核心情节和人物关系。';
+  return ADAPTATION_HIGHLIGHT_SYSTEM;
 }
 
 export async function adaptBook(translation: string, prompt: string): Promise<string> {
