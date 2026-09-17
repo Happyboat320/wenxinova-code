@@ -56,6 +56,9 @@ export default function ProfilePage() {
   const [application, setApplication] = useState<api.AdminApplication | null>(null);
   const [applicationRemark, setApplicationRemark] = useState('');
   const [applying, setApplying] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordCode, setPasswordCode] = useState('');
+  const [passwordCountdown, setPasswordCountdown] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -63,6 +66,12 @@ export default function ProfilePage() {
     setSignature(user.signature || '');
     setAvatar(user.avatar || null);
   }, [user]);
+  useEffect(() => { if (passwordCountdown <= 0) return; const timer = window.setInterval(() => setPasswordCountdown(v => Math.max(0, v - 1)), 1000); return () => window.clearInterval(timer); }, [passwordCountdown]);
+
+  const changePassword = async () => {
+    if (newPassword.length < 8 || !/^\d{4,8}$/.test(passwordCode)) { toast.error('请输入至少 8 位新密码和短信验证码'); return; }
+    try { await api.changePassword(newPassword, passwordCode); setNewPassword(''); setPasswordCode(''); toast.success('密码修改成功，请重新登录'); } catch (caught) { toast.error(caught instanceof Error ? caught.message : '密码修改失败'); }
+  };
 
   useEffect(() => {
     if (!user || user.role === 'admin') return;
@@ -159,6 +168,7 @@ export default function ProfilePage() {
               <span className="mt-1 block text-right text-xs opacity-50">{Array.from(signature).length}/100</span>
             </label>
             <button type="submit" disabled={saving || processingImage} className="btn-primary mt-5 w-full py-3 disabled:opacity-50">{saving ? '保存中…' : '保存个人资料'}</button>
+            <div className="mt-8 border-t border-amber-100 pt-7"><h3 className="text-lg font-semibold">修改密码</h3><div className="mt-3 flex gap-3"><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="新密码（至少 8 位）" className="min-w-0 flex-1 rounded-xl border border-amber-200 bg-transparent px-3 py-2" /><input value={passwordCode} onChange={e => setPasswordCode(e.target.value.replace(/\D/g, ''))} placeholder="短信验证码" className="w-32 rounded-xl border border-amber-200 bg-transparent px-3 py-2" /><button type="button" disabled={passwordCountdown > 0} onClick={async () => { try { const r = await api.sendPasswordChangeCode(); setPasswordCountdown(r.retryAfter || 60); toast.success('验证码已发送'); } catch (e) { toast.error(e instanceof Error ? e.message : '发送失败'); } }} className="whitespace-nowrap rounded-lg border border-amber-300 px-3 text-sm text-amber-800 disabled:opacity-50">{passwordCountdown ? `${passwordCountdown}s` : '获取验证码'}</button></div><button type="button" onClick={() => void changePassword()} className="btn-secondary mt-3">确认修改密码</button></div>
             <div className="mt-8 border-t border-amber-100 pt-7">
               {user.role === 'admin' ? <div className="rounded-xl bg-amber-50 p-5"><strong className="text-amber-900"><i className="fa-solid fa-shield-halved mr-2" />管理员账号</strong><p className="mt-2 text-sm text-stone-600">您可以审核社区作品和管理员申请。</p><Link to="/admin" className="btn-secondary mt-4 inline-block">进入管理审核台</Link></div> : <div>
                 <h3 className="text-lg font-semibold">申请成为管理员</h3>

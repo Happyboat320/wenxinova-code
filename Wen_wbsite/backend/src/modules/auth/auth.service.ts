@@ -115,6 +115,29 @@ export async function login(phone: string, password: string, metadata: RequestMe
   return issueSession(user, metadata);
 }
 
+export async function resetPassword(phone: string, password: string, code: string): Promise<void> {
+  if (!isValidPassword(password)) throw new AuthError(`密码至少 ${PASSWORD_MIN_LENGTH} 位，且不能超过 ${PASSWORD_MAX_BYTES} 字节`, 400, 'INVALID_PASSWORD');
+  if (!(await checkVerifyCode(phone, code))) throw new AuthError('验证码错误或已过期', 400, 'INVALID_SMS_CODE');
+  const user = await prisma.user.findUnique({ where: { phone } });
+  if (!user) throw new AuthError('手机号或验证码错误', 400, 'INVALID_RESET');
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(password, 12) } }),
+    prisma.refreshSession.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: now } }),
+  ]);
+}
+
+export async function changePassword(userId: number, password: string, code: string): Promise<void> {
+  if (!isValidPassword(password)) throw new AuthError(`密码至少 ${PASSWORD_MIN_LENGTH} 位，且不能超过 ${PASSWORD_MAX_BYTES} 字节`, 400, 'INVALID_PASSWORD');
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !(await checkVerifyCode(user.phone, code))) throw new AuthError('验证码错误或已过期', 400, 'INVALID_SMS_CODE');
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { passwordHash: await bcrypt.hash(password, 12) } }),
+    prisma.refreshSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } }),
+  ]);
+}
+
 async function revokeChain(sessionId: string): Promise<void> {
   const visited = new Set<string>();
   let currentId: string | null = sessionId;

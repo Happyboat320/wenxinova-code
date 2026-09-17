@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { memo, useContext, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
@@ -47,13 +47,23 @@ const coverOrbits = [
     }
 ] as const;
 
+const coverAliases: Record<string, string> = {
+    "隋唐演义2.png": "隋唐演义封面.png",
+    "隋唐演义3.png": "隋唐演义封面.png",
+    "隋唐演义4.png": "隋唐演义封面.png",
+    "长生殿2.png": "长生殿封面.png",
+    "长生殿3.png": "长生殿封面.png",
+    "桃花扇2.png": "桃花扇封面.png",
+    "桃花扇3.png": "桃花扇封面.png",
+};
+
 const buildDenseOrbit = (files: readonly string[], step: number, limit = Infinity) => files.flatMap((file, index, orbitFiles) => {
     const insertedCount = Math.floor(index / step);
     if (index % step !== 0 || insertedCount >= limit) return [file];
     return [file, orbitFiles[(index + Math.ceil(orbitFiles.length / 2)) % orbitFiles.length]];
 });
 
-function CoverOrbit({
+const CoverOrbit = memo(function CoverOrbit({
     files,
     radius,
     duration,
@@ -61,7 +71,7 @@ function CoverOrbit({
     angleOffset = 0,
     reverse = false,
     denseStep = 2,
-    denseLimit = Infinity
+    denseLimit = Infinity,
 }: {
     files: readonly string[];
     radius: string;
@@ -73,15 +83,10 @@ function CoverOrbit({
     denseLimit?: number;
 }) {
     const orbitFiles = buildDenseOrbit(files, denseStep, denseLimit);
-
     return (
         <ul className={`home-cover-orbit depth-${depth}${reverse ? " is-reverse" : ""}`} style={{ "--orbit-duration": `${duration}s` } as CSSProperties}>
             {orbitFiles.map((_, index) => (
-                <li
-                    key={`${depth}-bead-${index}`}
-                    className="home-cover-bead-position"
-                    style={{ "--cover-angle": `${angleOffset + (index + 0.5) * 360 / orbitFiles.length}deg`, "--cover-radius": radius } as CSSProperties}
-                >
+                <li key={`${depth}-bead-${index}`} className="home-cover-bead-position" style={{ "--cover-angle": `${angleOffset + (index + 0.5) * 360 / orbitFiles.length}deg`, "--cover-radius": radius } as CSSProperties}>
                     <span className="home-orbit-bead" />
                 </li>
             ))}
@@ -92,15 +97,21 @@ function CoverOrbit({
                     style={{ "--cover-angle": `${angleOffset + index * 360 / orbitFiles.length}deg`, "--cover-radius": radius } as CSSProperties}
                 >
                     <span className="home-cover-float" style={{ "--float-delay": `${-index * 0.43}s` } as CSSProperties}>
-                        <img src={`/home-covers/${encodeURIComponent(file)}`} alt="" />
+                        <img
+                            src={`/home-cover-thumbs/${encodeURIComponent((coverAliases[file] || file).replace(/\.png$/i, '.webp'))}?v=20260916`}
+                            alt=""
+                            decoding="async"
+                            fetchPriority="low"
+                            draggable={false}
+                        />
                     </span>
                 </li>
             ))}
         </ul>
     );
-}
+});
 
-function HomeBackground() {
+const HomeBackground = memo(function HomeBackground({ showCovers }: { showCovers: boolean }) {
     return (
         <div className="home-orbit-background" aria-hidden="true">
             <div className="home-paper-texture" />
@@ -109,7 +120,7 @@ function HomeBackground() {
                 <div className="home-depth-ring ring-1" />
                 <div className="home-depth-ring ring-2" />
                 <div className="home-depth-ring ring-3" />
-                {coverOrbits.map((orbit) => (
+                {showCovers && coverOrbits.map((orbit) => (
                     <CoverOrbit
                         key={orbit.depth}
                         files={orbit.files}
@@ -125,13 +136,13 @@ function HomeBackground() {
             </div>
         </div>
     );
-}
+});
 
 const featureItems = [
     ["bg-amber-100", "fa-language", "text-amber-800", "高保真文白转换", "确保翻译后的白话文流畅且不失原文神韵"],
     ["bg-red-100", "fa-paint-brush", "text-red-800", "可控的风格化改编", "实现用户指定风格（如悬疑、喜剧）的稳定输出"],
     ["bg-blue-100", "fa-diagram-project", "text-blue-800", "图谱化原典理解", "梳理人物关系、事件脉络与文本依据，让每次改编都有清晰根基"],
-    ["bg-green-100", "fa-comments", "text-green-800", "跨角色数字共演", "把经典角色带入同一场景，在人设一致的对话中碰撞出新故事"]
+    ["bg-green-100", "fa-masks-theater", "text-green-800", "跨角色数字共演", "把经典角色带入同一场景，在人设一致的对话中碰撞出新故事"]
 ];
 
 export default function Home() {
@@ -141,9 +152,24 @@ export default function Home() {
     const appRef = useRef<HTMLDivElement>(null);
     const cardsRef = useRef<HTMLElement>(null);
     const shouldReduceMotion = useReducedMotion();
+    const [showOrbitCovers, setShowOrbitCovers] = useState(() => window.matchMedia('(min-width: 768px)').matches);
     const [searchInput, setSearchInput] = useState('');
 
     useEffect(() => { appRef.current?.classList.add("fade-in"); }, []);
+
+    useEffect(() => {
+        const desktopQuery = window.matchMedia('(min-width: 768px)');
+        const updateCoverVisibility = () => setShowOrbitCovers(desktopQuery.matches);
+        desktopQuery.addEventListener('change', updateCoverVisibility);
+        return () => desktopQuery.removeEventListener('change', updateCoverVisibility);
+    }, []);
+
+    useEffect(() => {
+        const updateAnimationState = () => appRef.current?.classList.toggle('home-orbit-paused', document.hidden);
+        updateAnimationState();
+        document.addEventListener('visibilitychange', updateAnimationState);
+        return () => document.removeEventListener('visibilitychange', updateAnimationState);
+    }, []);
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -156,7 +182,7 @@ export default function Home() {
 
     const cards = [
         { path: "/classical-library", accent: "bg-amber-100", icon: "fa-scroll text-amber-800", title: "古典文库", description: "浏览四大名著及经典古籍，感受中华文化的博大精深", action: "开始探索" },
-        { path: "/digital-coplay", accent: "bg-green-100", icon: "fa-comments text-green-800", title: "数字共演", description: "从收藏夹选择多个角色，编排顺序并设定场景，让他们轮流对话", action: "开始共演" },
+        { path: "/digital-coplay", accent: "bg-green-100", icon: "fa-masks-theater text-green-800", title: "数字共演", description: "从收藏夹选择多个角色，编排顺序并设定场景，让他们轮流对话", action: "开始共演" },
         { path: "/ugc-community", accent: "bg-red-100", icon: "fa-users text-red-800", title: "UGC社区", description: "分享您的创意改编，发现他人的精彩作品，共同创作经典新篇", action: "加入社区" },
         { path: "/my-collection", accent: "bg-blue-100", icon: "fa-bookmark text-blue-800", title: "我的创作", description: "管理您的改编作品，查看收藏的经典片段，继续未完成的创作", action: "我的作品" }
     ];
@@ -174,7 +200,7 @@ export default function Home() {
 
     return (
         <div ref={appRef} className={`home-orbit-page h-screen ${isDark ? "text-gray-100" : "text-gray-800"}`}>
-            <HomeBackground />
+            <HomeBackground showCovers={showOrbitCovers} />
             <SiteHeader
                 className="home-site-header home-foreground fixed left-0 right-0 top-0 p-6"
                 beforeNavigation={isAuthenticated ? <div className="flex items-center gap-2 sm:gap-4">
@@ -283,8 +309,8 @@ export default function Home() {
                     </div>
                     <div className="flex items-center justify-center">
                         <div className="relative">
-                            <motion.div className="w-64 h-64 bg-amber-100 rounded-full opacity-50 absolute -top-10 -right-10 floating" animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.7, 0.5] }} transition={{ duration: 6, repeat: Infinity }} />
-                            <motion.div className="w-96 h-96 bg-red-100 rounded-full opacity-30 absolute -bottom-10 -left-10 floating" animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, delay: 1 }} />
+                            <motion.div className="w-64 h-64 bg-amber-100 rounded-full opacity-50 absolute -top-10 -right-10" animate={shouldReduceMotion ? undefined : { scale: [1, 1.1, 1], opacity: [0.5, 0.7, 0.5] }} transition={{ duration: 6, repeat: Infinity }} />
+                            <motion.div className="w-96 h-96 bg-red-100 rounded-full opacity-30 absolute -bottom-10 -left-10" animate={shouldReduceMotion ? undefined : { scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, delay: 1 }} />
                             <img src="https://space.coze.cn/api/coze_space/gen_image?image_size=landscape_4_3&prompt=chinese%20ancient%20scroll%20with%20calligraphy%20and%20painting%20art&sign=dc6a09330f9f8db14739b4c78d0105fb" alt="古籍展示" className="w-full h-auto rounded-xl shadow-2xl relative z-10 transform rotate-2 book-shadow" />
                         </div>
                     </div>
@@ -296,6 +322,7 @@ export default function Home() {
             {/* 页脚独立于特色区，手机端不会成为该区横向布局中的一列。 */}
             <footer className="home-footer home-foreground text-center text-sm opacity-70">
                 <p>© 2025 文心新述 - 古典小说智能改编平台 | 以科技传承文化经典</p>
+                <a href="https://beian.miit.gov.cn" target="_blank" rel="noreferrer">粤ICP备2026132405号-1</a>
             </footer>
         </div>
     );

@@ -12,7 +12,7 @@ import { resolveBookCover } from '../src/lib/book-covers';
 
 const prisma = new PrismaClient();
 const BACKEND_DIR = path.resolve(__dirname, '..');
-const COLLECTION_DIR = path.join(BACKEND_DIR, 'data', 'collections');
+const COLLECTION_DIR = path.join(BACKEND_DIR, 'data', 'collections', 'new_version');
 const COLLECTION_THEME = '整本导入';
 
 interface SourceRow {
@@ -21,6 +21,7 @@ interface SourceRow {
   全文翻译?: string;
   关键词?: string[] | string;
   梗概?: string;
+  注释?: Array<{ id?: number | string; content?: string } | string>;
 }
 
 interface CollectionDefinition {
@@ -35,8 +36,9 @@ interface CollectionDefinition {
 }
 
 const BASE_COLLECTIONS: CollectionDefinition[] = [
+  { file: '唐宋传奇选.json', title: '唐宋传奇选', author: '多人', dynasty: '唐宋', category: '唐宋传奇', unit: '篇', expectedCount: 39 },
   { file: '长生殿.json', title: '长生殿', author: '洪昇', dynasty: '清', category: '明清传奇', unit: '出/篇', expectedCount: 50 },
-  { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '明清传奇', unit: '出/篇', expectedCount: 53 },
+  { file: '桃花扇.json', title: '桃花扇', author: '孔尚任', dynasty: '清', category: '明清传奇', unit: '出/篇', expectedCount: 63 },
   { file: '金瓶梅.json', title: '金瓶梅', author: '兰陵笑笑生（疑）', dynasty: '明代', category: '世情小说', unit: '回', expectedCount: 100 },
   { file: '官场.json', title: '官场现形记', author: '李伯元', dynasty: '晚清', category: '世情小说', unit: '回', expectedCount: 60 },
   { file: '玉娇梨.json', title: '玉娇梨', author: '荑秋散人（一说天花藏主人）', dynasty: '明末清初', category: '世情小说', unit: '回', expectedCount: 20 },
@@ -54,8 +56,7 @@ const TMP_COLLECTIONS: CollectionDefinition[] = [
   { file: 'tmp/牡丹亭.json', title: '牡丹亭', author: '汤显祖', dynasty: '明', category: '明清传奇', unit: '出/篇', expectedCount: 55 },
   { file: 'tmp/皇明诸司廉明奇判公案.json', title: '皇明诸司廉明奇判公案', author: '余象斗编刊', dynasty: '明', category: '公案小说', unit: '则/篇', expectedCount: 59 },
   { file: 'tmp/紫钗记.json', title: '紫钗记', author: '汤显祖', dynasty: '明', category: '明清传奇', unit: '出/篇', expectedCount: 53 },
-  { file: 'tmp/蜜蜂计.json', title: '蜜蜂计', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 5 },
-  { file: 'tmp/蜜蜂记.json', title: '蜜蜂记', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 5 },
+  { file: 'tmp/蜜蜂记.json', title: '蜜蜂记', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 10 },
   { file: 'tmp/蝴蝶杯.json', title: '蝴蝶杯', author: '佚名', dynasty: '清', category: '世情小说', unit: '回', expectedCount: 10 },
   { file: 'tmp/邯郸记.json', title: '邯郸记', author: '汤显祖', dynasty: '明', category: '明清传奇', unit: '出/篇', expectedCount: 30 },
   { file: 'tmp/霞笺记.json', title: '霞笺记', author: '佚名', dynasty: '明末清初', category: '世情小说', unit: '回', expectedCount: 11 },
@@ -165,6 +166,20 @@ export function readCollection(definition: CollectionDefinition, directory = COL
     const originalText = clean(row.文本);
     if (!title || !originalText) throw new Error(`${definition.file} 第 ${index + 1} 条缺少题目或原文`);
     const keywords = Array.isArray(row.关键词) ? row.关键词.join('、') : clean(row.关键词);
+    const annotations = (row.注释 || []).map((annotation, annotationIndex) => {
+      const stringMatch = typeof annotation === 'string'
+        ? annotation.match(/^\\?\[(\d+)\]\s*([\s\S]*)$/)
+        : null;
+      const parsedIndex = Number(stringMatch?.[1] ?? String(typeof annotation === 'string' ? '' : annotation?.id ?? '').replace(/^\[|\]$/g, ''));
+      const content = clean(stringMatch?.[2] ?? (typeof annotation === 'string' ? '' : annotation?.content));
+      if (!Number.isInteger(parsedIndex) || parsedIndex < 1 || !content) {
+        throw new Error(`${definition.file} 第 ${index + 1} 条的第 ${annotationIndex + 1} 条注释无效`);
+      }
+      return { index: parsedIndex, content };
+    });
+    if (new Set(annotations.map(annotation => annotation.index)).size !== annotations.length) {
+      throw new Error(`${definition.file} 第 ${index + 1} 条存在重复的注释序号`);
+    }
     return {
       order: index + 1,
       title,
@@ -172,6 +187,7 @@ export function readCollection(definition: CollectionDefinition, directory = COL
       translatedText: clean(row.全文翻译) || null,
       summary: clean(row.梗概) || null,
       keywords: keywords || null,
+      annotations,
     };
   });
 }
@@ -194,9 +210,13 @@ async function createBackup(): Promise<string> {
   return backupPath;
 }
 
-export async function runImport(options: { dryRun: boolean; backup: boolean }): Promise<void> {
-  const sources = COLLECTIONS.map(definition => ({ definition, chapters: readCollection(definition) }));
-  const cleanupThemes = COLLECTIONS
+export async function runImport(options: { dryRun: boolean; backup: boolean; title?: string }): Promise<void> {
+  const definitions = options.title
+    ? COLLECTIONS.filter(definition => definition.title === options.title)
+    : COLLECTIONS;
+  if (!definitions.length) throw new Error(`未找到整本作品定义：${options.title}`);
+  const sources = definitions.map(definition => ({ definition, chapters: readCollection(definition) }));
+  const cleanupThemes = definitions
     .map(definition => definition.cleanupDocumentTheme)
     .filter((theme): theme is string => Boolean(theme));
   const cleanupCount = cleanupThemes.length
@@ -239,6 +259,7 @@ export async function runImport(options: { dryRun: boolean; backup: boolean }): 
         originalText: chapters[0].originalText,
         translatedText: chapters[0].translatedText,
         summary,
+        annotationCount: chapters.reduce((count, chapter) => count + chapter.annotations.length, 0),
       };
       const book = existing
         ? await tx.book.update({ where: { id: existing.id }, data })
@@ -246,25 +267,37 @@ export async function runImport(options: { dryRun: boolean; backup: boolean }): 
 
       // 数据源是完整快照，先清理再写入可避免已删除或重新排序的回目残留。
       await tx.bookChapter.deleteMany({ where: { bookId: book.id } });
-      await tx.bookChapter.createMany({ data: chapters.map(chapter => ({ bookId: book.id, ...chapter })) });
+      await tx.bookChapter.createMany({
+        data: chapters.map(({ annotations, ...chapter }) => ({
+          bookId: book.id,
+          ...chapter,
+          annotationsJson: annotations.length ? JSON.stringify(annotations) : null,
+        })),
+      });
     }
   }, { maxWait: 30_000, timeout: 120_000 });
 
   const imported = await prisma.book.findMany({
-    where: { theme: COLLECTION_THEME },
+    where: { theme: COLLECTION_THEME, title: { in: definitions.map(definition => definition.title) } },
     select: { title: true, _count: { select: { chapters: true } } },
     orderBy: { title: 'asc' },
   });
-  if (imported.length !== COLLECTIONS.length) throw new Error(`整本作品数量异常：${imported.length}`);
+  if (imported.length !== definitions.length) throw new Error(`整本作品数量异常：${imported.length}`);
   for (const book of imported) {
-    const expected = COLLECTIONS.find(item => item.title === book.title)?.expectedCount;
+    const expected = definitions.find(item => item.title === book.title)?.expectedCount;
     if (book._count.chapters !== expected) throw new Error(`${book.title} 回目数量异常：${book._count.chapters}`);
   }
   console.log(`整本作品导入完成：${imported.map(book => `${book.title} ${book._count.chapters} 篇`).join('；')}`);
 }
 
 function parseArgs(args: string[]) {
-  return { dryRun: args.includes('--dry-run'), backup: !args.includes('--no-backup') };
+  const bookAt = args.indexOf('--book');
+  if (bookAt >= 0 && !args[bookAt + 1]) throw new Error('--book 后需要提供书名');
+  return {
+    dryRun: args.includes('--dry-run'),
+    backup: !args.includes('--no-backup'),
+    title: bookAt >= 0 ? args[bookAt + 1] : undefined,
+  };
 }
 
 if (require.main === module) {

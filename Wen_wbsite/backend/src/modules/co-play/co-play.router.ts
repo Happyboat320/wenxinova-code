@@ -89,6 +89,7 @@ coPlayRouter.post('/jinling-letter/participation-options', requireAuth, aiUsageG
   try {
     const result = await coPlayService.createJinlingParticipationOptions(req.auth!.userId, {
       favoriteCharacterId: req.body?.favoriteCharacterId,
+      scene: req.body?.scene,
       context: req.body?.context,
     });
     if (result.kind === 'invalid') return res.status(400).json(error('请选择一个收藏角色参与对话', 400));

@@ -35,6 +35,12 @@ data/
 *.sqlite3-*
 *.sqlite3.*
 
+# 本地原始语料、处理结果与历史归档不进入源码仓库
+/Wen_wbsite/原始数据/
+/Wen_wbsite/原始数据.zip
+/Wen_wbsite/archive/
+/*_cleaned_openrouter.json
+
 # 本机服务安装包不属于网站源码
 *.deb
 

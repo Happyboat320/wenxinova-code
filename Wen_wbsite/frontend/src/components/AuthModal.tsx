@@ -8,7 +8,7 @@ interface Props {
   onAuthenticated: (session: api.AuthSession) => void;
 }
 
-type Mode = 'login' | 'register';
+type Mode = 'login' | 'register' | 'reset';
 
 export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
   const [mode, setMode] = useState<Mode>('login');
@@ -55,7 +55,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
     }
     try {
       setSending(true);
-      const result = await api.sendRegistrationCode(phone);
+      const result = await (mode === 'reset' ? api.sendPasswordResetCode(phone) : api.sendRegistrationCode(phone));
       setCountdown(result.retryAfter || 60);
       toast.success('验证码已发送');
     } catch (caught) {
@@ -75,7 +75,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
       toast.error('密码至少需要 8 位');
       return;
     }
-    if (mode === 'register' && password !== confirmation) {
+    if (mode !== 'login' && password !== confirmation) {
       toast.error('两次输入的密码不一致');
       return;
     }
@@ -83,16 +83,15 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
       toast.error('用户名需为 2-20 个字符');
       return;
     }
-    if (mode === 'register' && !/^\d{4,8}$/.test(code)) {
+    if (mode !== 'login' && !/^\d{4,8}$/.test(code)) {
       toast.error('请输入正确的短信验证码');
       return;
     }
 
     try {
       setSubmitting(true);
-      const session = mode === 'login'
-        ? await api.login(phone, password)
-        : await api.register(phone, password, code, nickname.trim());
+      const session = mode === 'login' ? await api.login(phone, password) : mode === 'register' ? await api.register(phone, password, code, nickname.trim()) : (await api.resetPassword(phone, password, code), null);
+      if (!session) { toast.success('密码重置成功，请使用新密码登录'); switchMode('login'); return; }
       onAuthenticated(session);
       onClose();
       toast.success(mode === 'login' ? '登录成功' : '注册成功');
@@ -147,7 +146,7 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
               placeholder={mode === 'register' ? '请设置至少 8 位密码' : '请输入密码'} maxLength={72}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
           </label>
-          {mode === 'register' && (
+          {mode !== 'login' && (
             <>
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium">确认密码</span>
@@ -169,9 +168,11 @@ export default function AuthModal({ open, onClose, onAuthenticated }: Props) {
               </label>
             </>
           )}
+          {mode === 'login' && <button type="button" onClick={() => switchMode('reset')} className="w-full text-sm text-amber-700 hover:underline">忘记密码？</button>}
+          {mode === 'reset' && <button type="button" onClick={() => switchMode('login')} className="w-full text-sm text-stone-500 hover:underline">返回登录</button>}
           <button type="submit" disabled={submitting}
             className="w-full rounded-lg bg-amber-700 py-3 font-medium text-white shadow-sm transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50">
-            {submitting ? '提交中…' : mode === 'login' ? '登录' : '创建账号'}
+            {submitting ? '提交中…' : mode === 'login' ? '登录' : mode === 'reset' ? '重置密码' : '创建账号'}
           </button>
           <p className="text-center text-xs text-stone-400">继续即表示您同意用户协议和隐私政策</p>
         </form>

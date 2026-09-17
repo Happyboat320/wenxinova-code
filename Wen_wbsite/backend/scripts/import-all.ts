@@ -2,9 +2,9 @@
  * 一键导入全部书库数据。
  *
  * 数据源：
- * 1. data/ancient_prose.json（通用古文库）
+ * 1. data/collections/new_version/ancient_prose.json（通用古文库）
  * 2. 小说目录信息.xlsx + texts/唐宋传奇选.txt（精选小说元数据、原文和注释）
- * 3. data/doc 目录及子目录中的 JSON（单篇补充文集）
+ * 3. data/collections/new_version/doc 目录及子目录中的 JSON（单篇补充文集）
  *
  * 保留 User、Creation 以及 Creation.bookId；精选与 JSON 同名时忽略精选版本。
  * 已有 JSON 数据按原始导入顺序原位更新，以保持 Book.id 稳定。
@@ -19,10 +19,10 @@ import { resolveBookCover } from '../src/lib/book-covers';
 
 const prisma = new PrismaClient();
 const BACKEND_DIR = path.resolve(__dirname, '..');
-const JSON_PATH = path.join(BACKEND_DIR, 'data', 'ancient_prose.json');
+const JSON_PATH = path.join(BACKEND_DIR, 'data', 'collections', 'new_version', 'ancient_prose.json');
 const EXCEL_PATH = path.join(BACKEND_DIR, '小说目录信息.xlsx');
 const TEXT_PATH = path.join(BACKEND_DIR, 'texts', '唐宋传奇选.txt');
-const DOCUMENT_DIR = path.join(BACKEND_DIR, 'data', 'doc');
+const DOCUMENT_DIR = path.join(BACKEND_DIR, 'data', 'collections', 'new_version', 'doc');
 const DOCUMENT_EXPECTED_COUNT = 523;
 const JSON_THEME = '新导入';
 const DOCUMENT_THEME_PREFIX = '文档导入：';

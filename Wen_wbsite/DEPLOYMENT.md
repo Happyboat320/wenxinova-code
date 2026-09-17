@@ -46,7 +46,7 @@ NODE_ENV="production"
 HOST="127.0.0.1"
 AUTH_COOKIE_SECURE="true"
 AUTH_COOKIE_DOMAIN=""
-CORS_ORIGINS="https://8.134.215.157"
+CORS_ORIGINS="https://wenxinova.cn,https://www.wenxinova.cn"
 TRUST_PROXY="true"
 MANTICORE_HTTP_URL="http://127.0.0.1:9308"
 MANTICORE_TIMEOUT_MS="5000"
@@ -64,7 +64,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now wenxin
 ```
 
-公网访问地址：`https://8.134.215.157`。安全组只需对外开放 TCP `80/443`，不要开放 `5000`。
+公网访问地址：`https://wenxinova.cn`（`www.wenxinova.cn` 也可访问）。安全组只需对外开放 TCP `80/443`，不要开放 `5000`。
 
 Nginx 的 HTTP 申请阶段与最终 HTTPS 配置分别保存在
 `deploy/nginx-wenxin-http.conf` 和 `deploy/nginx-wenxin-https.conf`。Certbot 续期部署钩子为

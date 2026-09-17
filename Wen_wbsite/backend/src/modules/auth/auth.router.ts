@@ -120,6 +120,32 @@ authRouter.post('/login', async (req, res) => {
   }
 });
 
+authRouter.post('/password/reset/code', async (req, res) => {
+  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+  if (!authService.PHONE_PATTERN.test(phone)) return res.status(400).json(error('请输入正确的中国大陆手机号', 400));
+  try { consumeLimit(`password-reset-code:phone:${phone}`, 1, 60_000); consumeLimit(`password-reset-code:ip:${req.ip}`, 10, 3_600_000); await authService.sendRegistrationCode(phone); res.json(success({ retryAfter: 60 }, '验证码已发送')); }
+  catch (caught) { sendAuthError(res, caught, '验证码发送失败'); }
+});
+
+authRouter.post('/password/reset', async (req, res) => {
+  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  try { if (!authService.PHONE_PATTERN.test(phone) || !authService.CODE_PATTERN.test(code)) throw new AuthError('手机号或验证码格式错误', 400); await authService.resetPassword(phone, password, code); res.json(success(null, '密码重置成功')); }
+  catch (caught) { sendAuthError(res, caught, '密码重置失败'); }
+});
+
+authRouter.post('/password/change/code', requireAuth, async (req, res) => {
+  try { const user = await authService.getCurrentUser(req.auth!.userId); consumeLimit(`password-change-code:user:${user.id}`, 1, 60_000); await authService.sendRegistrationCode(user.phone); res.json(success({ retryAfter: 60 }, '验证码已发送')); }
+  catch (caught) { sendAuthError(res, caught, '验证码发送失败'); }
+});
+
+authRouter.post('/password/change', requireAuth, async (req, res) => {
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : ''; const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  try { if (!authService.CODE_PATTERN.test(code)) throw new AuthError('请输入正确的短信验证码', 400); await authService.changePassword(req.auth!.userId, password, code); res.json(success(null, '密码修改成功，请重新登录')); }
+  catch (caught) { sendAuthError(res, caught, '密码修改失败'); }
+});
+
 authRouter.post('/refresh', async (req, res) => {
   const refreshToken = getCookie(req, REFRESH_COOKIE);
   if (!refreshToken) {

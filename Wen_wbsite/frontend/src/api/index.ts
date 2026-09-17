@@ -211,7 +211,7 @@ export interface CharacterChatMessage {
 
 export interface JinlingParticipationOption {
   playerLine: string;
-  replies: Array<{ characterName: '林黛玉' | '贾宝玉'; content: string }>;
+  replies: Array<{ characterName: string; content: string }>;
 }
 
 export interface CoPlaySession {
@@ -307,7 +307,7 @@ export async function regenerateKnowledgeGraph(id: number): Promise<KnowledgeGra
 
 export async function adaptBook(
   translation: string,
-  type: 'adapt' | 'creative' | 'script' | 'custom' | 'continue',
+  type: 'adapt' | 'creative' | 'script' | 'script-tasks' | 'custom' | 'continue',
   prompt: string
 ): Promise<string> {
   const response = await client.post<ApiResponse<{ adaptedContent: string }>>('/adapt', {
@@ -320,7 +320,7 @@ export async function adaptBook(
 
 export async function adaptBookStream(
   translation: string,
-  type: 'adapt' | 'creative' | 'script' | 'custom' | 'continue',
+  type: 'adapt' | 'creative' | 'script' | 'script-tasks' | 'custom' | 'continue',
   prompt: string,
   onDelta: (content: string) => void,
   signal?: AbortSignal,
@@ -407,6 +407,10 @@ export async function sendRegistrationCode(phone: string): Promise<{ retryAfter:
   const response = await client.post<ApiResponse<{ retryAfter: number }>>('/auth/register/code', { phone });
   return unwrap(response.data, '验证码发送失败');
 }
+export async function sendPasswordResetCode(phone: string): Promise<{ retryAfter: number }> { const response = await client.post<ApiResponse<{ retryAfter: number }>>('/auth/password/reset/code', { phone }); return unwrap(response.data, '验证码发送失败'); }
+export async function resetPassword(phone: string, password: string, code: string): Promise<void> { const response = await client.post<ApiResponse<null>>('/auth/password/reset', { phone, password, code }); unwrap(response.data, '密码重置失败'); }
+export async function sendPasswordChangeCode(): Promise<{ retryAfter: number }> { const response = await client.post<ApiResponse<{ retryAfter: number }>>('/auth/password/change/code'); return unwrap(response.data, '验证码发送失败'); }
+export async function changePassword(password: string, code: string): Promise<void> { const response = await client.post<ApiResponse<null>>('/auth/password/change', { password, code }); unwrap(response.data, '密码修改失败'); setAccessToken(null); }
 
 export function register(phone: string, password: string, code: string, nickname: string): Promise<AuthSession> {
   return authenticate('/auth/register', phone, password, code, nickname);
@@ -594,6 +598,7 @@ export async function chatWithFavoriteCharacter(id: number, data: {
 
 export async function generateJinlingParticipationOptions(data: {
   favoriteCharacterId: number;
+  scene?: 'jinling' | 'sangu' | 'water-margin';
   context: Array<{ role: 'character' | 'system'; characterName: string | null; content: string }>;
 }): Promise<{ character: { id: number; name: string }; options: JinlingParticipationOption[] }> {
   const response = await client.post<ApiResponse<{ character: { id: number; name: string }; options: JinlingParticipationOption[] }>>(

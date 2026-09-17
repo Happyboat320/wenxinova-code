@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { AuthContext } from '@/contexts/authContext';
 import { useTheme } from '@/hooks/useTheme';
 import JinlingLetterDialogue, { type JinlingLetterDialogueHandle } from '@/components/JinlingLetterDialogue';
+import SanguPlotDialogue from '@/components/SanguPlotDialogue';
+import WaterMarginPlotDialogue from '@/components/WaterMarginPlotDialogue';
 import SiteHeader from '@/components/SiteHeader';
 import * as api from '@/api';
 
@@ -74,14 +76,14 @@ export default function DigitalCoPlayPage() {
   const { isDark } = useTheme();
   const { user, isInitializing, openLogin } = useContext(AuthContext);
   const jinlingLetterRef = useRef<JinlingLetterDialogueHandle>(null);
+  const sanguPlotRef = useRef<JinlingLetterDialogueHandle>(null);
+  const waterMarginPlotRef = useRef<JinlingLetterDialogueHandle>(null);
   const theaterScrollRef = useRef<HTMLDivElement>(null);
   const [activePanel, setActivePanel] = useState<CoPlayPanel>('dialogue');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [favorites, setFavorites] = useState<api.FavoriteCharacter[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [scene, setScene] = useState(scenePresets[0].text);
   const [activeScenePresetName, setActiveScenePresetName] = useState(scenePresets[0].name);
-  const [loading, setLoading] = useState(false);
   const [activeFavoriteId, setActiveFavoriteId] = useState<number | null>(null);
   const [soulMemoryInput, setSoulMemoryInput] = useState('');
   const [attributeSaving, setAttributeSaving] = useState(false);
@@ -337,7 +339,12 @@ export default function DigitalCoPlayPage() {
             )}
           </div>
         ) : (
-          <div className="grid h-full place-items-center text-center text-stone-400">暂无可对话角色。</div>
+          <div className="grid h-full place-items-center px-6 text-center text-stone-400">
+            <div>
+              <p>暂无可对话角色。</p>
+              <p className="mt-2 text-sm">请从“古典文库 → 知识图谱 → 人物关系”中选择人物。</p>
+            </div>
+          </div>
         )}
       </div>
 
@@ -398,6 +405,28 @@ export default function DigitalCoPlayPage() {
               1
             </button>
           )}
+          {activeScenePreset.name === '三国演义' && (
+            <button
+              type="button"
+              onClick={() => sanguPlotRef.current?.init()}
+              className="absolute left-1/2 top-1/3 z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-100/90 bg-stone-950/55 text-lg font-semibold text-amber-50 shadow-lg shadow-stone-950/30 outline-none backdrop-blur transition hover:scale-105 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-2 focus-visible:ring-amber-100"
+              aria-label="打开标号1三顾茅庐剧情"
+              title="三顾茅庐"
+            >
+              1
+            </button>
+          )}
+          {activeScenePreset.name === '水浒传' && (
+            <button
+              type="button"
+              onClick={() => waterMarginPlotRef.current?.init()}
+              className="absolute left-[14%] top-[76%] z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-100/90 bg-stone-950/55 text-lg font-semibold text-amber-50 shadow-lg shadow-stone-950/30 outline-none backdrop-blur transition hover:scale-105 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-2 focus-visible:ring-amber-100"
+              aria-label="打开标号1倒拔垂杨柳剧情"
+              title="倒拔垂杨柳"
+            >
+              1
+            </button>
+          )}
         </div>
       </div>
 
@@ -417,7 +446,6 @@ export default function DigitalCoPlayPage() {
                     type="button"
                     onClick={() => {
                       setActiveScenePresetName(preset.name);
-                      setScene(preset.text);
                     }}
                     className={`h-11 rounded-md border px-2 text-sm font-medium transition sm:min-w-20 sm:px-3 ${
                       active
@@ -441,6 +469,20 @@ export default function DigitalCoPlayPage() {
           onComplete={() => toast.success('剧情结束')}
         />
       )}
+      {activeScenePreset.name === '三国演义' && (
+        <SanguPlotDialogue
+          ref={sanguPlotRef}
+          favorites={favorites}
+          onComplete={() => toast.success('剧情结束')}
+        />
+      )}
+      {activeScenePreset.name === '水浒传' && (
+        <WaterMarginPlotDialogue
+          ref={waterMarginPlotRef}
+          favorites={favorites}
+          onComplete={() => toast.success('剧情结束')}
+        />
+      )}
     </section>
   );
 
@@ -456,7 +498,7 @@ export default function DigitalCoPlayPage() {
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-          {favorites.length === 0 && <p className="rounded-lg bg-amber-50 p-4 text-sm text-stone-500">暂无收藏角色。可在“创意工坊 · 分角色剧本”中分析并收藏角色。</p>}
+          {favorites.length === 0 && <p className="rounded-lg bg-stone-50 p-4 text-sm text-stone-400">暂无收藏角色。请从“古典文库 → 知识图谱 → 人物关系”中选择人物。</p>}
           {favorites.map(character => {
             const tags = characterTags(character);
             const active = activeFavorite?.id === character.id;

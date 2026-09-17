@@ -14,11 +14,37 @@ export async function adaptBook(translation: string, type: string, prompt: strin
       return deepseek.creativeWrite(translation, prompt);
     case 'script':
       return deepseek.generateCharacterScript(translation, prompt); // 此处 prompt 为角色名
+    case 'script-tasks':
+      return deepseek.generateScriptTasks(translation, prompt);
     case 'custom':
       return deepseek.customPrompt(translation, prompt);
     case 'adapt':
     default:
       return deepseek.adaptBook(translation, prompt);
+  }
+}
+
+export function adaptBookStream(
+  translation: string,
+  type: string,
+  prompt: string,
+  onDelta: (content: string) => void,
+  signal?: AbortSignal,
+) {
+  switch (type) {
+    case 'continue':
+      return deepseek.continueWritingStream(translation, prompt, onDelta, signal);
+    case 'creative':
+      return deepseek.creativeWriteStream(translation, prompt, onDelta, signal);
+    case 'script':
+      return deepseek.generateCharacterScriptStream(translation, prompt, onDelta, signal);
+    case 'script-tasks':
+      return deepseek.generateScriptTasksStream(translation, prompt, onDelta, signal);
+    case 'custom':
+      return deepseek.customPromptStream(translation, prompt, onDelta, signal);
+    case 'adapt':
+    default:
+      return deepseek.adaptBookStream(translation, prompt, onDelta, signal);
   }
 }
 

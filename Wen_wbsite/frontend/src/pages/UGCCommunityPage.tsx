@@ -226,7 +226,7 @@ const UGCCommunityPage = () => {
                   <div className="flex flex-col gap-3 text-sm opacity-70 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-amber-100 text-xs text-amber-800">
-                        {creation.user.avatar ? <img src={creation.user.avatar} alt="" className="h-full w-full object-cover" /> : (displayName.charAt(0) || <i className="fa-solid fa-user" />)}
+                        {creation.user.avatar ? <img src={creation.user.avatar} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : (displayName.charAt(0) || <i className="fa-solid fa-user" />)}
                       </span>
                       <span className="truncate">{displayName}</span>
                     </span>
@@ -274,7 +274,7 @@ const UGCCommunityPage = () => {
                     <p className="mt-1 text-sm opacity-60">{detail.book?.author || '匿名原作'} · {new Date(detail.publishedAt || detail.createdAt).toLocaleString('zh-CN')}</p>
                     <div className="mt-3 flex items-center gap-2 text-sm text-amber-800">
                       <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-amber-100 text-xs">
-                        {detail.user.avatar ? <img src={detail.user.avatar} alt="" className="h-full w-full object-cover" /> : authorName(detail.user).charAt(0)}
+                        {detail.user.avatar ? <img src={detail.user.avatar} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : authorName(detail.user).charAt(0)}
                       </span>
                       <span>发布者：{authorName(detail.user)}</span>
                     </div>
@@ -334,7 +334,7 @@ const UGCCommunityPage = () => {
                           const commentAuthor = authorName(comment.user);
                           return <li key={comment.id} className="flex gap-3 py-5">
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-amber-100 text-sm text-amber-800">
-                              {comment.user.avatar ? <img src={comment.user.avatar} alt="" className="h-full w-full object-cover" /> : commentAuthor.charAt(0)}
+                              {comment.user.avatar ? <img src={comment.user.avatar} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : commentAuthor.charAt(0)}
                             </span>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-3">

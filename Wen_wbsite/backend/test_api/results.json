@@ -1,0 +1,199 @@
+{
+  "generatedAt": "2026年9月2日 13:07:11",
+  "sourceFile": "唐宋传奇选.txt",
+  "model": "deepseek-v4-flash",
+  "apiUrl": "https://api.deepseek.com/chat/completions",
+  "runsPerSample": 3,
+  "sampleLengths": [
+    200,
+    1000,
+    3000
+  ],
+  "databaseUsed": false,
+  "results": [
+    {
+      "sampleLength": 200,
+      "run": 1,
+      "success": true,
+      "durationMs": 12526.606926,
+      "responseChars": 208,
+      "responseFile": "responses/200-chars-run-1.txt",
+      "requestId": "9aae4813-398c-46fb-abfa-98ecf072e52c",
+      "usage": {
+        "prompt_tokens": 308,
+        "completion_tokens": 1249,
+        "total_tokens": 1557,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1089
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 308
+      }
+    },
+    {
+      "sampleLength": 200,
+      "run": 2,
+      "success": true,
+      "durationMs": 31735.806806,
+      "responseChars": 208,
+      "responseFile": "responses/200-chars-run-2.txt",
+      "requestId": "d5b0a22c-be1e-4dcb-8b8d-3fa97c2d46b3",
+      "usage": {
+        "prompt_tokens": 308,
+        "completion_tokens": 3071,
+        "total_tokens": 3379,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2913
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 52
+      }
+    },
+    {
+      "sampleLength": 200,
+      "run": 3,
+      "success": true,
+      "durationMs": 32200.09475299999,
+      "responseChars": 207,
+      "responseFile": "responses/200-chars-run-3.txt",
+      "requestId": "3fbbb643-21f7-4080-b242-3bc1dc6fc849",
+      "usage": {
+        "prompt_tokens": 308,
+        "completion_tokens": 3503,
+        "total_tokens": 3811,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3340
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 52
+      }
+    },
+    {
+      "sampleLength": 1000,
+      "run": 1,
+      "success": true,
+      "durationMs": 10205.804251000009,
+      "responseChars": 1175,
+      "responseFile": "responses/1000-chars-run-1.txt",
+      "requestId": "728d6fbb-1776-406f-9d0b-60896709474a",
+      "usage": {
+        "prompt_tokens": 966,
+        "completion_tokens": 861,
+        "total_tokens": 1827,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 41
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 710
+      }
+    },
+    {
+      "sampleLength": 1000,
+      "run": 2,
+      "success": true,
+      "durationMs": 58784.586796999996,
+      "responseChars": 1184,
+      "responseFile": "responses/1000-chars-run-2.txt",
+      "requestId": "8d68b10f-5059-4eb8-9565-925bc6bbc6ff",
+      "usage": {
+        "prompt_tokens": 966,
+        "completion_tokens": 5835,
+        "total_tokens": 6801,
+        "prompt_tokens_details": {
+          "cached_tokens": 896
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5013
+        },
+        "prompt_cache_hit_tokens": 896,
+        "prompt_cache_miss_tokens": 70
+      }
+    },
+    {
+      "sampleLength": 1000,
+      "run": 3,
+      "success": true,
+      "durationMs": 9509.978122999979,
+      "responseChars": 1092,
+      "responseFile": "responses/1000-chars-run-3.txt",
+      "requestId": "31b349b3-4849-4f4f-ba1d-89e3905bca1e",
+      "usage": {
+        "prompt_tokens": 966,
+        "completion_tokens": 789,
+        "total_tokens": 1755,
+        "prompt_tokens_details": {
+          "cached_tokens": 896
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 29
+        },
+        "prompt_cache_hit_tokens": 896,
+        "prompt_cache_miss_tokens": 70
+      }
+    },
+    {
+      "sampleLength": 3000,
+      "run": 1,
+      "success": true,
+      "durationMs": 27212.139853,
+      "responseChars": 3447,
+      "responseFile": "responses/3000-chars-run-1.txt",
+      "requestId": "ae2394ea-ebd5-4342-85c9-2a7845f7f538",
+      "usage": {
+        "prompt_tokens": 2644,
+        "completion_tokens": 2446,
+        "total_tokens": 5090,
+        "prompt_tokens_details": {
+          "cached_tokens": 896
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 34
+        },
+        "prompt_cache_hit_tokens": 896,
+        "prompt_cache_miss_tokens": 1748
+      }
+    },
+    {
+      "sampleLength": 3000,
+      "run": 2,
+      "success": false,
+      "durationMs": 87823.79670399998,
+      "responseChars": 0,
+      "error": "HTTP 200：API 返回译文为空"
+    },
+    {
+      "sampleLength": 3000,
+      "run": 3,
+      "success": true,
+      "durationMs": 26665.758673999982,
+      "responseChars": 3385,
+      "responseFile": "responses/3000-chars-run-3.txt",
+      "requestId": "b7236dbe-19df-4dab-9ff0-1236b21a6e94",
+      "usage": {
+        "prompt_tokens": 2644,
+        "completion_tokens": 2400,
+        "total_tokens": 5044,
+        "prompt_tokens_details": {
+          "cached_tokens": 2560
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 21
+        },
+        "prompt_cache_hit_tokens": 2560,
+        "prompt_cache_miss_tokens": 84
+      }
+    }
+  ]
+}

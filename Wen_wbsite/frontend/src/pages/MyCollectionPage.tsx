@@ -10,7 +10,7 @@ import SiteHeader from '@/components/SiteHeader';
 const categoryLabels: Record<api.CreationCategory, string> = {
   adaptation: '改编',
   script: '剧本杀',
-  props: '道具',
+  props: '线索',
   dm: 'DM 手册',
   coplay: '数字共演',
   other: '其他',

@@ -2,7 +2,7 @@
  * JSON 数据导入脚本
  * 
  * 使用说明：
- * 1. 确保数据文件位于 backend/data/ancient_prose.json
+ * 1. 确保数据文件位于 backend/data/collections/new_version/ancient_prose.json
  * 2. 数据格式应为包含多个条目的 JSON 数组，每个条目包含：题目、文本、全文翻译、关键词、梗概等字段
  * 3. 在 backend 目录下运行：npm run import:json (需在 package.json 中配置该命令)
  *    或直接运行：npx ts-node scripts/import-json.ts
@@ -19,7 +19,7 @@ const __dirname = path.dirname(__filename);
 
 const prisma = new PrismaClient();
 
-const JSON_PATH = path.join(__dirname, '..', 'data', 'ancient_prose.json');
+const JSON_PATH = path.join(__dirname, '..', 'data', 'collections', 'new_version', 'ancient_prose.json');
 const DEFAULT_BOOK_NAME = '新导入';
 
 interface ProseEntry {

@@ -4,9 +4,12 @@ import * as api from '@/api';
 
 export type JinlingDialogueLine = {
   id: number;
-  speaker: '黛玉' | '宝玉';
+  speaker: string;
   content: string;
 };
+
+export type PlotSpeakerTone = { avatar: string; role: string; ring: string; glow: string; portrait: string };
+export type PlotPortrait = { speaker: string; align: 'left' | 'right'; className?: string };
 
 export type JinlingLetterDialogueHandle = {
   init: (options?: { startIndex?: number }) => void;
@@ -22,6 +25,12 @@ type JinlingLetterDialogueProps = {
   typewriterSpeed?: number;
   favorites?: api.FavoriteCharacter[];
   onComplete?: () => void;
+  title?: string;
+  ariaLabel?: string;
+  lines?: JinlingDialogueLine[];
+  tones?: Record<string, PlotSpeakerTone>;
+  portraits?: PlotPortrait[];
+  participationScene?: 'jinling' | 'sangu' | 'water-margin';
 };
 
 type DialogueDisplayLine = {
@@ -119,7 +128,7 @@ export const jinlingLetterDialogueLines: JinlingDialogueLine[] = [
   { id: 86, speaker: '宝玉', content: '明日一早，我便来寻妹妹。' },
 ];
 
-const speakerTone: Record<JinlingDialogueLine['speaker'], { avatar: string; role: string; ring: string; glow: string; portrait: string }> = {
+const speakerTone: Record<string, PlotSpeakerTone> = {
   黛玉: {
     avatar: '黛',
     role: '林黛玉',
@@ -136,15 +145,13 @@ const speakerTone: Record<JinlingDialogueLine['speaker'], { avatar: string; role
   },
 };
 
-const clampLineIndex = (index: number) => Math.min(Math.max(index, 0), jinlingLetterDialogueLines.length - 1);
-
 const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLetterDialogueProps>(
-  ({ className = '', typewriterSpeed = 36, favorites = [], onComplete }, ref) => {
+  ({ className = '', typewriterSpeed = 36, favorites = [], onComplete, title = '潇湘馆・黛玉葬花', ariaLabel = '潇湘馆黛玉葬花剧情对话系统', lines = jinlingLetterDialogueLines, tones = speakerTone, portraits = [{ speaker: '宝玉', align: 'left' }, { speaker: '黛玉', align: 'right' }], participationScene = 'jinling' }, ref) => {
     const [visible, setVisible] = useState(false);
     const [lineIndex, setLineIndex] = useState(0);
     const [typedLength, setTypedLength] = useState(0);
     const [ended, setEnded] = useState(false);
-    const [portraitFailed, setPortraitFailed] = useState<Partial<Record<JinlingDialogueLine['speaker'], boolean>>>({});
+    const [portraitFailed, setPortraitFailed] = useState<Record<string, boolean>>({});
     const [participationOpen, setParticipationOpen] = useState(false);
     const [selectedFavoriteId, setSelectedFavoriteId] = useState<number | null>(null);
     const [participationLoading, setParticipationLoading] = useState(false);
@@ -153,11 +160,11 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
     const [insertedLines, setInsertedLines] = useState<DialogueDisplayLine[]>([]);
     const [insertedLineIndex, setInsertedLineIndex] = useState(0);
     const completeCalledRef = useRef(false);
-    const originalLine = jinlingLetterDialogueLines[lineIndex];
+    const originalLine = lines[lineIndex];
     const insertedLine = insertedLines[insertedLineIndex] || null;
     const currentLine: DialogueDisplayLine = insertedLine || originalLine;
-    const currentTone = currentLine.speaker === '黛玉' || currentLine.speaker === '宝玉'
-      ? speakerTone[currentLine.speaker]
+    const currentTone = tones[currentLine.speaker]
+      ? tones[currentLine.speaker]
       : {
           avatar: Array.from(currentLine.speaker)[0] || '客',
           role: currentLine.speaker,
@@ -178,7 +185,7 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
 
     const openAt = (startIndex = 0) => {
       completeCalledRef.current = false;
-      setLineIndex(clampLineIndex(startIndex));
+      setLineIndex(Math.min(Math.max(startIndex, 0), lines.length - 1));
       setTypedLength(0);
       setEnded(false);
       setPortraitFailed({});
@@ -213,7 +220,7 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
         setTypedLength(0);
         return;
       }
-      if (lineIndex < jinlingLetterDialogueLines.length - 1) {
+      if (lineIndex < lines.length - 1) {
         setLineIndex(current => current + 1);
         setTypedLength(0);
         return;
@@ -223,8 +230,8 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
     };
 
     const skip = () => {
-      setLineIndex(jinlingLetterDialogueLines.length - 1);
-      setTypedLength(jinlingLetterDialogueLines[jinlingLetterDialogueLines.length - 1].content.length);
+      setLineIndex(lines.length - 1);
+      setTypedLength(lines[lines.length - 1].content.length);
       setEnded(true);
       setInsertedLines([]);
       setInsertedLineIndex(0);
@@ -244,9 +251,9 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
 
     const buildParticipationContext = () => {
       const start = Math.max(0, lineIndex - 5);
-      return jinlingLetterDialogueLines.slice(start, lineIndex + 1).map(line => ({
+      return lines.slice(start, lineIndex + 1).map(line => ({
         role: 'character' as const,
-        characterName: speakerTone[line.speaker].role,
+        characterName: tones[line.speaker]?.role || line.speaker,
         content: line.content,
       }));
     };
@@ -260,6 +267,7 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
         setParticipationLoading(true);
         const result = await api.generateJinlingParticipationOptions({
           favoriteCharacterId: selectedFavoriteId,
+          scene: participationScene,
           context: buildParticipationContext(),
         });
         setParticipatingFavorite(result.character);
@@ -277,7 +285,7 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
       setInsertedLines([
         { speaker: favorite.name, content: option.playerLine, participant: true },
         ...option.replies.map(reply => ({
-          speaker: reply.characterName === '林黛玉' ? '黛玉' : '宝玉',
+          speaker: Object.keys(tones).find(key => tones[key].role === reply.characterName) || reply.characterName,
           content: reply.content,
         })),
       ]);
@@ -316,8 +324,8 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
 
     if (!visible) return null;
 
-    const renderPortrait = (speaker: JinlingDialogueLine['speaker'], align: 'left' | 'right') => {
-      const tone = speakerTone[speaker];
+    const renderPortrait = (speaker: string, align: 'left' | 'right', extraClass = '') => {
+      const tone = tones[speaker];
       const active = currentLine.speaker === speaker;
       return (
         <div
@@ -325,7 +333,13 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
             align === 'left'
               ? 'left-0 w-[48%] justify-start sm:left-[4%] sm:w-[31%] sm:min-w-[330px] sm:max-w-[460px]'
               : 'right-0 w-[48%] justify-end sm:right-[4%] sm:w-[31%] sm:min-w-[330px] sm:max-w-[460px]'
-          } ${active || currentLine.participant ? 'opacity-100 saturate-100' : 'opacity-55 saturate-75'}`}
+          } ${extraClass} ${
+            active || currentLine.participant
+              ? 'opacity-100 saturate-100'
+              : participationScene === 'sangu'
+                ? 'opacity-55 saturate-75'
+                : 'opacity-55 saturate-75'
+          }`}
         >
           {!portraitFailed[speaker] && (
             <img
@@ -353,8 +367,8 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
 
     return (
       <aside
-        className={`pointer-events-auto absolute inset-x-2 bottom-3 top-4 z-30 mx-auto max-w-[1760px] ${className}`}
-        aria-label="潇湘馆黛玉葬花剧情对话系统"
+        className={`pointer-events-auto absolute inset-x-2 bottom-3 top-4 z-30 mx-auto max-w-[1760px] ${participationScene === 'sangu' ? 'sangu-dialogue' : ''} ${className}`}
+        aria-label={ariaLabel}
       >
         <div
           role="button"
@@ -381,11 +395,10 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
           <div className="relative h-full">
             <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full border border-stone-900/10 bg-[#fffaf0]/75 px-3 py-2 text-center shadow-sm backdrop-blur sm:top-5 sm:px-6">
               <p className="text-xs font-medium uppercase tracking-[0.22em] text-stone-500">Plot Dialogue</p>
-              <h3 className="mt-0.5 whitespace-nowrap text-base font-semibold text-stone-950 sm:text-2xl">潇湘馆・黛玉葬花</h3>
+              <h3 className="mt-0.5 whitespace-nowrap text-base font-semibold text-stone-950 sm:text-2xl">{title}</h3>
             </div>
 
-            {renderPortrait('宝玉', 'left')}
-            {renderPortrait('黛玉', 'right')}
+            {portraits.map(portrait => <div key={portrait.speaker}>{renderPortrait(portrait.speaker, portrait.align, portrait.className)}</div>)}
 
             <div className="absolute left-1/2 top-28 z-10 h-40 w-40 -translate-x-1/2 rounded-full border border-emerald-900/10 bg-white/15 blur-[1px]" />
             <div className="absolute left-1/2 top-32 z-10 h-28 w-28 -translate-x-1/2 rounded-full border border-stone-900/10 bg-[#fffaf0]/30" />
@@ -402,7 +415,7 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
                   </div>
                 </div>
                 <span className="shrink-0 rounded-full border border-stone-200 bg-white/70 px-3 py-1 text-xs text-stone-500">
-                  第{lineIndex + 1}/{jinlingLetterDialogueLines.length}句
+                  第{lineIndex + 1}/{lines.length}句
                 </span>
               </div>
 
@@ -412,7 +425,7 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
               </p>
 
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-stone-900/10 pt-4">
-                <span className="text-sm text-stone-500">
+                <span className="text-sm font-semibold text-[#7f1d1d]">
                   {ended ? '剧情结束' : insertedLines.length > 0 ? '参与角色正在影响这段对话' : '点击界面任意位置继续'}
                 </span>
                 <div className="flex items-center gap-2">

@@ -125,6 +125,9 @@ npm run import:collections
 npx tsx scripts/import-collections.ts --dry-run
 ```
 
+可使用 `--book <书名>` 只校验或更新一部作品；数据中的逐回注释会与原文、
+译文一并导入。
+
 导入完成后需执行 `npm run search:reindex`，让五部作品进入全文检索索引。
 
 ## 导入结果验证

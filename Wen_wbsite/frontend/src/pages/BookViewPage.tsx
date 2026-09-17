@@ -33,6 +33,8 @@ export default function BookViewPage() {
   const bookId = Number.parseInt(id || '', 10);
   const requestedChapterValue = new URLSearchParams(location.search).get('chapter');
   const requestedChapterId = requestedChapterValue ? Number.parseInt(requestedChapterValue, 10) : undefined;
+  const returnPageValue = new URLSearchParams(location.search).get('fromPage');
+  const returnPage = returnPageValue && /^\d+$/.test(returnPageValue) ? Number(returnPageValue) : 1;
 
   const [bookData, setBookData] = useState<BookData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,7 +162,7 @@ export default function BookViewPage() {
 
   const readingActive = activeTab !== 'adapt' && activeTab !== 'knowledge';
   const requestedSection = new URLSearchParams(location.search).get('section');
-  const initialScriptSection = requestedSection === 'props' || requestedSection === 'dm' ? requestedSection : 'role';
+  const initialScriptSection = requestedSection === 'tasks' ? requestedSection : 'role';
   const activeChapterIndex = bookData.chapter
     ? bookData.chapters.findIndex(chapter => chapter.id === bookData.chapter?.id)
     : -1;
@@ -183,7 +185,7 @@ export default function BookViewPage() {
   return (
     <div style={backgroundStyle} className={`reading-page reading-theme-${preferences.background} min-h-screen`}>
       <div className="reading-header border-b px-4 py-4 sm:px-6 lg:px-12">
-        <SiteHeader beforeNavigation={<button onClick={() => navigate('/classical-library')} className="reading-muted transition hover:opacity-75">← 返回文库</button>} />
+        <SiteHeader beforeNavigation={<button onClick={() => navigate(`/classical-library?page=${returnPage}`)} className="reading-muted transition hover:opacity-75">← 返回文库</button>} />
       </div>
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -256,7 +258,27 @@ export default function BookViewPage() {
                   <button type="button" aria-label="增大字号" disabled={fontSizeIndex >= READING_FONT_SIZES.length - 1} onClick={() => adjustFontSize(1)} className="reading-step-button px-3 py-1 font-bold disabled:cursor-not-allowed disabled:opacity-35">+</button>
                 </div>
                 <label>背景 <select value={preferences.background} onChange={e => setPreferences(p => ({ ...p, background: e.target.value as ReadingBackground }))} className="reading-control rounded border px-2 py-1"><option value="paper">宣纸</option><option value="mist">雾灰</option><option value="green">青绿</option><option value="ink">墨色</option><option value="custom">本地图片</option></select></label>
-                <label className="reading-accent cursor-pointer">选图<input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setPreferences(p => ({ ...p, background: 'custom', customImage: String(reader.result) })); reader.readAsDataURL(file); }} /></label>
+                <label className="reading-accent cursor-pointer">选图<input type="file" accept="image/*" className="hidden" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const image = new Image();
+                        image.onload = () => {
+                            // 偏好设置保存在 localStorage；压缩图片避免大图超过浏览器存储配额，刷新后仍能保留。
+                            const maxSide = 1600;
+                            const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+                            const canvas = document.createElement('canvas');
+                            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+                            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+                            canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+                            setPreferences(p => ({ ...p, background: 'custom', customImage: canvas.toDataURL('image/jpeg', 0.82) }));
+                        };
+                        image.src = String(reader.result);
+                    };
+                    reader.readAsDataURL(file);
+                    e.currentTarget.value = '';
+                }} /></label>
               </div>
             </div>
             <div className="mb-6 flex flex-wrap gap-3">

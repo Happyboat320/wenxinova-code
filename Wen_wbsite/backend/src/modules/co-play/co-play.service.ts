@@ -183,6 +183,7 @@ export async function chatWithFavoriteCharacter(userId: number, id: number, inpu
 
 export async function createJinlingParticipationOptions(userId: number, input: {
   favoriteCharacterId?: unknown;
+  scene?: unknown;
   context?: unknown;
 }) {
   const favoriteCharacterId = Number(input.favoriteCharacterId);
@@ -199,14 +200,20 @@ export async function createJinlingParticipationOptions(userId: number, input: {
       })).filter(item => item.content)
     : [];
 
-  const options = await generateJinlingParticipationOptions({
+  const participant = {
     name: favorite.name,
     description: favorite.description,
     deeds: favorite.deeds,
     sourceTitle: favorite.sourceChapterTitle
       ? `${favorite.sourceTitle || '未知文本'} · ${favorite.sourceChapterTitle}`
       : favorite.sourceTitle,
-  }, context);
+  };
+  // 保持原“梦断金陵”调用签名不变，其他经典剧情按各自场景生成参与回应。
+  const options = input.scene === 'sangu'
+    ? await generateJinlingParticipationOptions(participant, context, 'sangu')
+    : input.scene === 'water-margin'
+      ? await generateJinlingParticipationOptions(participant, context, 'water-margin')
+      : await generateJinlingParticipationOptions(participant, context);
 
   return {
     kind: 'created' as const,

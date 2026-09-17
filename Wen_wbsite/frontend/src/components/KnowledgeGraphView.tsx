@@ -9,6 +9,9 @@ export default function KnowledgeGraphView({ bookId }: { bookId: number }) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [tab, setTab] = useState<'timeline' | 'relationships'>('timeline');
+  const [joiningName, setJoiningName] = useState<string | null>(null);
+  const [joinedNames, setJoinedNames] = useState<Set<string>>(() => new Set());
+  const [pendingJoin, setPendingJoin] = useState<api.KnowledgeGraph['relationships']['nodes'][number] | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -37,6 +40,39 @@ export default function KnowledgeGraphView({ bookId }: { bookId: number }) {
     }
   };
 
+  const joinCoPlay = async (node: api.KnowledgeGraph['relationships']['nodes'][number]) => {
+    if (!user) {
+      setPendingJoin(node);
+      toast.error('登录后即可将该人物加入数字共演');
+      openLogin();
+      return;
+    }
+    if (joiningName) return;
+    try {
+      setJoiningName(node.name);
+      await api.addFavoriteCharacter({
+        bookId,
+        name: node.name,
+        description: node.description || null,
+        deeds: null,
+        sourceType: 'ai',
+      });
+      setJoinedNames(current => new Set(current).add(node.name));
+      toast.success('已加入数字共演');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : '加入数字共演失败');
+    } finally {
+      setJoiningName(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!user || !pendingJoin || joiningName) return;
+    const node = pendingJoin;
+    setPendingJoin(null);
+    void joinCoPlay(node);
+  }, [user, pendingJoin]);
+
   if (loading) return <div className="rounded-xl bg-white py-24 text-center shadow">正在加载知识图谱…</div>;
   if (!graph) return (
     <section className="rounded-xl border border-amber-100 bg-white px-6 py-24 text-center shadow-lg">
@@ -62,7 +98,7 @@ export default function KnowledgeGraphView({ bookId }: { bookId: number }) {
           </div>
         </div>
       </div>
-      {tab === 'timeline' ? <Timeline events={graph.timeline} /> : <RelationshipGraph data={graph.relationships} />}
+      {tab === 'timeline' ? <Timeline events={graph.timeline} /> : <RelationshipGraph data={graph.relationships} joiningName={joiningName} joinedNames={joinedNames} onJoin={joinCoPlay} />}
     </section>
   );
 }
@@ -79,7 +115,12 @@ function Timeline({ events }: { events: api.KnowledgeGraph['timeline'] }) {
   </ol>;
 }
 
-function RelationshipGraph({ data }: { data: api.KnowledgeGraph['relationships'] }) {
+function RelationshipGraph({ data, joiningName, joinedNames, onJoin }: {
+  data: api.KnowledgeGraph['relationships'];
+  joiningName: string | null;
+  joinedNames: Set<string>;
+  onJoin: (node: api.KnowledgeGraph['relationships']['nodes'][number]) => void;
+}) {
   const width = 900;
   const height = 560;
   // 使用确定性的环形布局，避免引入重量较大的图可视化依赖。
@@ -103,11 +144,25 @@ function RelationshipGraph({ data }: { data: api.KnowledgeGraph['relationships']
             <text x={mx} y={my + 4} textAnchor="middle" fontSize="12" fill="#854d0e">{edge.relation.slice(0, 8)}</text>
           </g>;
         })}
-        {data.nodes.map(node => {
+        {data.nodes.map((node, index) => {
           const point = positions.get(node.id)!;
-          return <g key={node.id}>
-            <circle cx={point.x} cy={point.y} r="48" fill="#fffbeb" stroke="#b45309" strokeWidth="2" />
+          const buttonAbove = point.y > height / 2;
+          return <g key={node.id} className="kg-person-node" tabIndex={0} aria-label={`${node.name}，可加入数字共演`}>
+            <circle className="kg-person-orbit" style={{ animationDuration: `${24 + (index % 5) * 4}s` }} cx={point.x} cy={point.y} r="53" fill="none" stroke="#d6b46c" strokeWidth="1.2" strokeDasharray={index % 2 ? '3 10 14 7' : '12 7 3 11'} data-direction={index % 2 ? 'reverse' : 'normal'} />
+            <circle className="kg-person-circle" cx={point.x} cy={point.y} r="48" fill="#fffbeb" stroke="#b45309" strokeWidth="2" />
             <text x={point.x} y={point.y + 5} textAnchor="middle" fontSize="17" fontWeight="600" fill="#78350f">{node.name.slice(0, 7)}</text>
+            <foreignObject x={point.x - 53} y={buttonAbove ? point.y - 77 : point.y + 49} width="106" height="28" className="kg-person-action-wrap">
+              <button
+                type="button"
+                className="kg-person-action"
+                disabled={joiningName !== null || joinedNames.has(node.name)}
+                onClick={() => onJoin(node)}
+                aria-label={`将${node.name}加入数字共演`}
+              >
+                <i className={`fa-solid ${joiningName === node.name ? 'fa-spinner fa-spin' : joinedNames.has(node.name) ? 'fa-check' : 'fa-plus'}`} aria-hidden="true" />
+                {joiningName === node.name ? '加入中' : joinedNames.has(node.name) ? '已加入数字共演' : '加入数字共演'}
+              </button>
+            </foreignObject>
           </g>;
         })}
       </svg>

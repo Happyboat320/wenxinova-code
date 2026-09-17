@@ -20,12 +20,13 @@ const LibraryPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = (searchParams.get('q') || '').trim();
+  const pageFromUrl = Number.parseInt(searchParams.get('page') || '', 10);
 
   const [books, setBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<api.CategoryOption[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchInput, setSearchInput] = useState(searchQuery);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(Number.isInteger(pageFromUrl) && pageFromUrl > 0 ? pageFromUrl : 1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ const LibraryPage = () => {
   useEffect(() => {
     // 支持从首页进入、浏览器前进后退及分享链接恢复检索关键词。
     setSearchInput(searchQuery);
-    setCurrentPage(1);
+    if (!searchParams.get('page')) setCurrentPage(1);
   }, [searchQuery]);
 
   useEffect(() => {
@@ -179,8 +180,10 @@ const LibraryPage = () => {
             >
               <div className="relative h-52 overflow-hidden sm:h-60">
                 <img
-                  src={book.image || "/library-covers/警世恒言通用.png"}
+                  src={`${book.image || "/library-covers/警世恒言通用.png"}${(book.image || '').includes('?') ? '&' : '?'}v=20260915-covers`}
                   alt={book.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
@@ -197,7 +200,7 @@ const LibraryPage = () => {
                 </p>
                 <button
                   className="w-full btn-primary"
-                  onClick={() => navigate(`/book/${book.id}`)}
+                  onClick={() => navigate(`/book/${book.id}?fromPage=${currentPage}`)}
                 >
                   查看详情
                 </button>

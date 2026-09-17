@@ -149,8 +149,8 @@ describe('文库实际数据分类', () => {
       characters: [],
       annotations: [{ index: 1, content: '普通注释' }],
       chapters: [
-        { id: 11, order: 1, title: '第一回', originalText: '首回正文', summary: '首回梗概' },
-        { id: 12, order: 2, title: '第二回', originalText: '次回正文', summary: null },
+        { id: 11, order: 1, title: '第一回', originalText: '首回正文', summary: '首回梗概', annotationsJson: null },
+        { id: 12, order: 2, title: '第二回', originalText: '次回正文', summary: null, annotationsJson: '[{"index":1,"content":"回目注释"}]' },
       ],
     });
 
@@ -158,7 +158,7 @@ describe('文库实际数据分类', () => {
       title: '玉娇梨',
       content: '次回正文',
       chapter: { id: 12, title: '第二回' },
-      annotations: [],
+      annotations: [{ index: 1, content: '回目注释' }],
     });
   });
 });
