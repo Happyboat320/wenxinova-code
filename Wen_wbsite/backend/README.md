@@ -18,7 +18,7 @@
 backend/
 ├── prisma/
 │   ├── schema.prisma      # 数据库模型定义
-│   └── seed.ts            # 种子数据脚本
+│   └── migrations/        # 数据库迁移
 ├── src/
 │   ├── app.ts             # Express 应用配置
 │   ├── server.ts          # 服务器入口
