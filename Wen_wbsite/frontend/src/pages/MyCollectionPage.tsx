@@ -8,12 +8,10 @@ import * as api from '@/api';
 import SiteHeader from '@/components/SiteHeader';
 
 const categoryLabels: Record<api.CreationCategory, string> = {
-  adaptation: '改编',
+  adaptation: '风格化改编',
   script: '剧本杀',
-  props: '线索',
-  dm: 'DM 手册',
+  props: '剧本杀',
   coplay: '数字共演',
-  other: '其他',
 };
 
 const MyCollectionPage = () => {

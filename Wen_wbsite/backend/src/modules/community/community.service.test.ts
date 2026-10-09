@@ -24,7 +24,7 @@ vi.mock('../../lib/prisma.js', () => ({
   },
 }));
 
-import { addCreationComment, getCreationDetail, getRecentCreations, toggleCreationLike } from './community.service.js';
+import { addCreationComment, getCreationCategories, getCreationDetail, getRecentCreations, toggleCreationLike } from './community.service.js';
 
 describe('UGC 草稿隔离', () => {
   beforeEach(() => {
@@ -46,6 +46,18 @@ describe('UGC 草稿隔离', () => {
     expect(creationMock.count).toHaveBeenCalledWith({ where: { category: 'adaptation', status: 'published' } });
   });
 
+  it('剧本杀筛选同时查询剧本与线索子类型', async () => {
+    creationMock.findMany.mockResolvedValue([]);
+    creationMock.count.mockResolvedValue(0);
+    await getRecentCreations(1, 'script');
+    expect(creationMock.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { category: { in: ['script', 'props'] }, status: 'published' },
+    }));
+    expect(creationMock.count).toHaveBeenCalledWith({
+      where: { category: { in: ['script', 'props'] }, status: 'published' },
+    });
+  });
+
   it('社区详情也不允许通过 ID 读取草稿', async () => {
     creationMock.findFirst.mockResolvedValue(null);
     await expect(getCreationDetail(9)).resolves.toBeNull();
@@ -59,7 +71,7 @@ describe('UGC 草稿隔离', () => {
       id: 3,
       userId: 1,
       bookId: null,
-      category: 'other',
+      category: 'props',
       prompt: '测试作品',
       createdAt: new Date(),
       publishedAt: new Date(),
@@ -69,7 +81,22 @@ describe('UGC 草稿隔离', () => {
     }]);
     creationMock.count.mockResolvedValue(1);
     const result = await getRecentCreations();
-    expect(result.list[0]).toMatchObject({ likeCount: 8, commentCount: 2 });
+    expect(result.list[0]).toMatchObject({ category: 'script', likeCount: 8, commentCount: 2 });
+  });
+
+  it('社区仅展示三类，并将剧本和线索数量合并', async () => {
+    creationMock.groupBy.mockResolvedValue([
+      { category: 'adaptation', _count: { _all: 3 } },
+      { category: 'script', _count: { _all: 2 } },
+      { category: 'props', _count: { _all: 4 } },
+      { category: 'coplay', _count: { _all: 1 } },
+    ]);
+
+    await expect(getCreationCategories()).resolves.toEqual([
+      { value: 'adaptation', label: '风格化改编', count: 3 },
+      { value: 'script', label: '剧本杀', count: 6 },
+      { value: 'coplay', label: '数字共演', count: 1 },
+    ]);
   });
 
   it('点赞接口创建首次点赞并返回最新数量', async () => {

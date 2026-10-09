@@ -217,7 +217,16 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
         }
         setInsertedLines([]);
         setInsertedLineIndex(0);
+        if (lineIndex < lines.length - 1) {
+          // 参与发言是在当前固定台词之后穿插的；结束后应接下一句，
+          // 不再重放穿插前已经说过的台词。
+          setLineIndex(current => current + 1);
+          setTypedLength(0);
+          return;
+        }
         setTypedLength(0);
+        setEnded(true);
+        callComplete();
         return;
       }
       if (lineIndex < lines.length - 1) {
@@ -401,9 +410,6 @@ const JinlingLetterDialogue = forwardRef<JinlingLetterDialogueHandle, JinlingLet
             </div>
 
             {portraits.map(portrait => <div key={portrait.speaker}>{renderPortrait(portrait.speaker, portrait.align, portrait.className)}</div>)}
-
-            <div className="absolute left-1/2 top-28 z-10 h-40 w-40 -translate-x-1/2 rounded-full border border-emerald-900/10 bg-white/15 blur-[1px]" />
-            <div className="absolute left-1/2 top-32 z-10 h-28 w-28 -translate-x-1/2 rounded-full border border-stone-900/10 bg-[#fffaf0]/30" />
 
             <section className="absolute inset-x-3 bottom-3 z-30 mx-auto max-w-[840px] rounded-xl border border-stone-900/15 bg-[#fffaf0]/94 p-3 shadow-2xl shadow-stone-950/30 backdrop-blur-md sm:inset-x-[25%] sm:bottom-8 sm:rounded-2xl sm:p-6">
               <div className="mb-4 flex items-center justify-between gap-4">

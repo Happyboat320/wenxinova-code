@@ -1,10 +1,6 @@
-# 
+# 文心新述前端
 
-项目编号: 7569552464711319848
-
-本项目是由 [网站开发专家](https://space.coze.cn/) 创建.
-
-[**项目地址**](https://space.coze.cn/task/7569552464711319848)
+React、Vite、TypeScript 网站前端。完整配置与部署说明见 [项目说明](../README.md) 和 [部署说明](../DEPLOYMENT.md)。
 
 ## 本地开发
 

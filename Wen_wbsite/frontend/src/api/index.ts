@@ -133,7 +133,8 @@ export interface KnowledgeGraph {
   generatedAt: string;
 }
 
-export type CreationCategory = 'adaptation' | 'script' | 'props' | 'dm' | 'coplay' | 'other';
+// props 是线索草稿的内部子类型；社区展示时由后端合并为 script（剧本杀）。
+export type CreationCategory = 'adaptation' | 'script' | 'props' | 'coplay';
 
 export interface CategoryOption {
   value: string;

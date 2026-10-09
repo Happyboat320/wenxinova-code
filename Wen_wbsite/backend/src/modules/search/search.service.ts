@@ -39,7 +39,7 @@ export function searchLibraryIds(
   });
 }
 
-export function searchCommunityIds(query: string, page: number, pageSize: number, category?: string) {
+export function searchCommunityIds(query: string, page: number, pageSize: number, category?: string | string[]) {
   return searchDocumentIds({
     index: COMMUNITY_INDEX,
     query,

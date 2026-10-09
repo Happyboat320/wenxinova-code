@@ -4,7 +4,7 @@
 
 @font-face {
   font-family: 'ZhengQingKeNanBeiCiGongPuSongTi';
-  src: url('/fonts/ZhengQingKeNanBeiCiGongPuSongTi.ttf') format('truetype');
+  src: url('/fonts/ZhengQingKeNanBeiCiGongPuSongTi-home.ttf?v=20261009') format('truetype');
   font-style: normal;
   font-weight: 400;
   font-display: swap;
@@ -531,7 +531,7 @@ body {
   scroll-behavior: smooth;
   scroll-snap-type: y mandatory;
   overscroll-behavior-y: contain;
-  background: #f8f3e7;
+  background: #f7f2e8;
   font-family: 'ZhengQingKeNanBeiCiGongPuSongTi', 'Noto Serif SC', serif;
 }
 
@@ -546,7 +546,7 @@ body {
 
 .home-site-header {
   z-index: 30;
-  background: linear-gradient(180deg, rgba(248,243,231,.88), rgba(248,243,231,0));
+  background: linear-gradient(180deg, rgba(247,242,232,.88), rgba(247,242,232,0));
 }
 
 .home-scroll-section {
@@ -629,6 +629,7 @@ body {
   outline: 0;
   color: #4d3b2b;
   background: transparent;
+  font-family: 'Inter', 'Noto Serif SC', sans-serif;
   font-size: 17px;
   letter-spacing: .04em;
 }
@@ -737,21 +738,24 @@ body {
   pointer-events: none;
   background:
     radial-gradient(circle at 50% 50%,
-      #fffdf3 0%,
-      #fbf1d8 28%,
-      #f0ddad 56%,
-      #e3c47f 78%,
-      #d6ad5d 100%);
+      #fffaf0 0%,
+      #faf0dc 28%,
+      #f4e5c8 56%,
+      #ecd6ae 78%,
+      #e2c58e 100%);
 }
 
 .home-paper-texture {
   position: absolute;
   inset: 0;
-  opacity: .26;
+  opacity: .34;
   mix-blend-mode: multiply;
   background-image:
-    repeating-linear-gradient(3deg, rgba(125,83,34,.045) 0 1px, transparent 1px 6px),
-    repeating-linear-gradient(91deg, rgba(255,255,255,.3) 0 1px, transparent 1px 8px);
+    radial-gradient(ellipse at 23% 31%, rgba(116,78,36,.13) 0 .45px, transparent .8px),
+    radial-gradient(ellipse at 71% 64%, rgba(139,97,47,.1) 0 .4px, transparent .75px),
+    repeating-linear-gradient(3deg, rgba(125,83,34,.055) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(91deg, rgba(255,255,255,.32) 0 1px, transparent 1px 9px);
+  background-size: 9px 11px, 13px 15px, auto, auto;
 }
 
 .home-concentric-disc {
@@ -963,6 +967,31 @@ body {
     overscroll-behavior-y: auto;
   }
 
+  .home-orbit-background {
+    background: #eee3c9;
+  }
+
+  .home-orbit-background::before,
+  .home-orbit-background::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .home-orbit-background::before {
+    background: url('/home-mobile-background.webp') center top / cover no-repeat;
+    opacity: .78;
+  }
+
+  .home-orbit-background::after {
+    background: rgba(255, 250, 239, .2);
+  }
+
+  .home-paper-texture,
+  .home-concentric-disc {
+    opacity: .24;
+  }
+
   .home-site-header { padding: max(.75rem, env(safe-area-inset-top)) 1rem .75rem; }
   .home-site-header .title-serif { font-size: 1.25rem; }
   .home-site-header > div:last-child { gap: .35rem; }
@@ -1139,8 +1168,8 @@ body {
 
 @media(min-width:640px){
   /* 群雄逐鹿：刘备、诸葛亮同时收小，并按原图有效人物高度校准到近似等高。 */
-  .portrait-liu-bei{--portrait-height:88%}
-  .portrait-zhuge-liang{--portrait-height:90%}
+  .portrait-liu-bei{--portrait-height:84%}
+  .portrait-zhuge-liang{--portrait-height:86%}
 
   /* 义聚梁山：张三、李四落脚更低，且明确矮于前排的鲁智深、林冲。 */
   .sangu-portrait-guard-left.portrait-zhang-san,

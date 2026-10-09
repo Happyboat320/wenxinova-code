@@ -433,7 +433,7 @@ export default function DigitalCoPlayPage() {
             <button
               type="button"
               onClick={() => journeyPlotRef.current?.init()}
-              className="absolute left-[58%] top-[35%] z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-100/90 bg-stone-950/55 text-lg font-semibold text-amber-50 shadow-lg shadow-stone-950/30 outline-none backdrop-blur transition hover:scale-105 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-2 focus-visible:ring-amber-100"
+              className="absolute left-1/2 top-1/2 z-20 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-amber-100/90 bg-stone-950/55 text-lg font-semibold text-amber-50 shadow-lg shadow-stone-950/30 outline-none backdrop-blur transition hover:scale-105 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-2 focus-visible:ring-amber-100"
               aria-label="打开标号1火焰山三借芭蕉扇剧情"
               title="火焰山・三借芭蕉扇"
             >

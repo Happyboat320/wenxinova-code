@@ -6,6 +6,7 @@ dist/
 dist-ssr/
 build/
 out/
+output/
 *.tsbuildinfo
 
 # Test and tool caches
@@ -22,6 +23,13 @@ coverage/
 !.env.*.example
 /backend.env.before-https
 /nginx.before-https/
+/.agents/
+/.aws/
+/.codex/
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Runtime/import data and local databases
 data/
@@ -39,7 +47,27 @@ data/
 /Wen_wbsite/原始数据/
 /Wen_wbsite/原始数据.zip
 /Wen_wbsite/archive/
+/Wen_wbsite/字体/
+/Wen_wbsite/首页设计稿/
 /*_cleaned_openrouter.json
+
+# Source archives and local backups
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+backups/
+backup/
+*.bak
+*.backup
+*.before-*
+
+# Generated API benchmark results (keep runner and input fixtures)
+/Wen_wbsite/backend/test_api/responses/
+/Wen_wbsite/backend/test_api/results.json
+/Wen_wbsite/backend/test_api/耗时报告.md
 
 # 本机服务安装包不属于网站源码
 *.deb
@@ -59,6 +87,7 @@ lerna-debug.log*
 tmp/
 temp/
 *.tmp
+*.local
 *.swp
 *.swo
 *~

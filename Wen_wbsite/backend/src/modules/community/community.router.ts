@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import * as communityService from './community.service.js';
 import { success, error } from '../../lib/response.js';
-import { isCreationCategory } from './community.types.js';
+import { isCommunityCategory } from './community.types.js';
 import { optionalAuth, requireAuth } from '../auth/auth.middleware.js';
 import { isSearchQueryTooLong, normalizeSearchQuery } from '../search/search.service.js';
 import { SearchUnavailableError } from '../../lib/manticore.js';
@@ -13,7 +13,7 @@ communityRouter.get('/creations', async (req: Request, res: Response) => {
   try {
     const page = Math.max(parseInt(req.query.page as string) || 1, 1);
     const category = req.query.category;
-    if (category !== undefined && !isCreationCategory(category)) {
+    if (category !== undefined && !isCommunityCategory(category)) {
       return res.status(400).json(error('无效的社区分类', 400));
     }
     const query = normalizeSearchQuery(req.query.q);

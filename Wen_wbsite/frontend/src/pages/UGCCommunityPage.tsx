@@ -83,7 +83,7 @@ const UGCCommunityPage = () => {
     }
   };
 
-  const categoryLabel = (value: api.CreationCategory) => categories.find(category => category.value === value)?.label || '其他';
+  const categoryLabel = (value: api.CreationCategory) => categories.find(category => category.value === value)?.label || '未分类';
   const authorName = (user: api.CommunityCreation['user']) => user.nickname?.trim() || user.phone || '未设置昵称';
 
   const closeDetail = () => {

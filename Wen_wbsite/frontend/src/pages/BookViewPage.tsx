@@ -154,7 +154,14 @@ export default function BookViewPage() {
 
   const indentLines = (text: string) => bookData?.title === '明清传奇' ? text : text.split('\n').map(line => `　　${line}`).join('\n');
   const renderText = (text: string, annotated: boolean) => {
-    const normalized = text.replace(ESCAPED_MARKER_PATTERN, '');
+    const unescaped = text.replace(ESCAPED_MARKER_PATTERN, '');
+    // 含注释的文章隐藏序号后，删除空行及原本只含注释序号的行。
+    const normalized = bookData?.annotations.length
+      ? unescaped
+        .split(/\r\n|[\n\r\v\f\u0085\u2028\u2029]/)
+        .filter(line => line.replace(MARKER_PATTERN, '').trim().length > 0)
+        .join('\n')
+      : unescaped;
     if (!annotated) return indentLines(normalized.replace(MARKER_PATTERN, ''));
 
     return indentLines(normalized).split(MARKER_PATTERN).map((part, index) => {
@@ -370,7 +377,7 @@ export default function BookViewPage() {
         )}
       </main>
 
-      <footer className="reading-header reading-muted border-t py-6 text-center text-sm">© 2025 文心新述 · 古典小说智能改编平台</footer>
+      <footer className="reading-header reading-muted border-t py-6 text-center text-sm">© 2026 文心新述 · 古典小说智能改编平台</footer>
     </div>
   );
 }

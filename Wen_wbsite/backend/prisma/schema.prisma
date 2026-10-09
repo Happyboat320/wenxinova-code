@@ -264,7 +264,7 @@ model Creation {
   userId      Int
   bookId      Int?
   coPlaySessionId Int?
-  category    String    @default("other") // 社区分类：adaptation/script/props/dm/coplay/other
+  category    String    @default("adaptation") // props 为线索草稿子类型，社区展示时并入 script（剧本杀）
   status      String    @default("draft") // draft/pending/published/rejected
   prompt      String    // 提示词
   content     String    // 生成的内容

@@ -250,7 +250,7 @@ const LibraryPage = () => {
 
       {/* 页脚 */}
       <footer className="mt-20 text-center text-sm opacity-70">
-        <p>© 2025 文心新述 - 古典小说智能改编平台</p>
+        <p>© 2026 文心新述 - 古典小说智能改编平台</p>
       </footer>
     </div>
   );

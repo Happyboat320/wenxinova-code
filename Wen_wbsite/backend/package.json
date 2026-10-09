@@ -18,6 +18,7 @@
     "import:all": "prisma migrate deploy && tsx scripts/import-all.ts",
     "import:collections": "prisma migrate deploy && tsx scripts/import-collections.ts",
     "process:taohuashan": "tsx scripts/process-taohuashan-annotations.ts",
+    "dedupe:taohuashan-annotations": "tsx scripts/dedupe-taohuashan-annotations.ts",
     "dedupe:taohuashan-stage": "tsx scripts/dedupe-taohuashan-stage-directions.ts",
     "split:linchuan": "tsx scripts/split-linchuan.ts",
     "search:reindex": "tsx scripts/reindex-search.ts",

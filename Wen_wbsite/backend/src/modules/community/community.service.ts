@@ -1,12 +1,16 @@
 import prisma from '../../lib/prisma.js';
-import { CREATION_CATEGORIES, type CreationCategory } from './community.types.js';
+import { COMMUNITY_CATEGORIES, toCommunityCategory, type CommunityCategory } from './community.types.js';
 import { searchCommunityIds } from '../search/search.service.js';
 
 const PAGE_SIZE = 20;
 
 // 获取社区创作分页；列表接口不返回正文，避免一次加载大量 Markdown。
-export async function getRecentCreations(page: number = 1, category?: CreationCategory, query?: string) {
-  const where = category ? { category, status: 'published' } : { status: 'published' };
+export async function getRecentCreations(page: number = 1, category?: CommunityCategory, query?: string) {
+  // 剧本和线索保留独立草稿，但在社区查询、统计和展示时属于同一个“剧本杀”。
+  const categoryFilter = category === 'script'
+    ? { category: { in: ['script', 'props'] } }
+    : category ? { category } : {};
+  const where = { ...categoryFilter, status: 'published' };
   const select = {
         id: true,
         userId: true,
@@ -37,7 +41,12 @@ export async function getRecentCreations(page: number = 1, category?: CreationCa
   let creations;
   let totalCount;
   if (query) {
-    const searchResult = await searchCommunityIds(query, page, PAGE_SIZE, category);
+    const searchResult = await searchCommunityIds(
+      query,
+      page,
+      PAGE_SIZE,
+      category === 'script' ? ['script', 'props'] : category,
+    );
     totalCount = searchResult.total;
     const matches = searchResult.ids.length === 0 ? [] : await prisma.creation.findMany({
       where: { id: { in: searchResult.ids }, status: 'published' },
@@ -64,6 +73,7 @@ export async function getRecentCreations(page: number = 1, category?: CreationCa
   return {
     list: creations.map(({ _count, ...creation }) => ({
       ...creation,
+      category: toCommunityCategory(creation.category) || 'adaptation',
       likeCount: _count.likes,
       commentCount: _count.comments,
       user: { nickname: creation.user.nickname || '未设置昵称', avatar: creation.user.avatar },
@@ -82,8 +92,12 @@ export async function getCreationCategories() {
     where: { status: 'published' },
     _count: { _all: true },
   });
-  const counts = new Map(groups.map(group => [group.category, group._count._all]));
-  return CREATION_CATEGORIES.map(category => ({ ...category, count: counts.get(category.value) || 0 }));
+  const counts = new Map<CommunityCategory, number>(COMMUNITY_CATEGORIES.map(category => [category.value, 0]));
+  for (const group of groups) {
+    const category = toCommunityCategory(group.category);
+    if (category) counts.set(category, (counts.get(category) || 0) + group._count._all);
+  }
+  return COMMUNITY_CATEGORIES.map(category => ({ ...category, count: counts.get(category.value) || 0 }));
 }
 
 // 获取某一篇创作详情
@@ -135,6 +149,7 @@ export async function getCreationDetail(id: number, currentUserId?: number) {
   const { _count, likes, comments, ...detail } = creation;
   return {
     ...detail,
+    category: toCommunityCategory(detail.category) || 'adaptation',
     likeCount: _count.likes,
     commentCount: _count.comments,
     likedByCurrentUser: likes.length > 0,

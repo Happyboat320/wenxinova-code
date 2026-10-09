@@ -12,9 +12,9 @@ const coverOrbits = [
         duration: 420,
         angleOffset: -8,
         files: [
-            "唐宋传奇集封面 (2).png", "桃花扇3.png", "唐宋传奇.png", "三言封面.png", "二拍封面2.png",
+            "唐宋传奇集封面 (2).png", "唐宋传奇.png", "三言封面.png", "二拍封面2.png",
             "宋元明话本.png", "唐五代笔记小说.png", "封面.png", "明代笔记小说.png", "宋元小说话本.png",
-            "官场现形记.png", "隋唐演义2.png", "临川四梦封面.png", "李渔全集封面.png", "明清传奇.png",
+            "官场现形记.png", "临川四梦封面.png", "李渔全集封面.png", "明清传奇.png",
             "新刻绣像批评金瓶梅封面.png", "金瓶梅封面.png"
         ]
     },
@@ -26,8 +26,8 @@ const coverOrbits = [
         reverse: true,
         files: [
             "孤本小说集.png", "唐宋传奇集封面.png", "二拍封面.png", "三言封面3.png", "宋元笔记小说.png",
-            "唐五代志怪传奇序录封面.png", "长生殿2.png", "清平山堂话本.png", "太平广记封面.png",
-            "隋唐演义封面.png", "玉娇梨4.png", "长生殿3.png", "长生殿封面.png", "搜神记.png",
+            "唐五代志怪传奇序录封面.png", "清平山堂话本.png", "太平广记封面.png",
+            "玉娇梨4.png", "搜神记.png",
             "三言二拍封面.png", "唐宋传奇总集目录（这本我们可能没有但可以借用封面？）.png"
         ]
     },
@@ -39,23 +39,15 @@ const coverOrbits = [
         denseStep: 3,
         denseLimit: 5,
         files: [
-            "汉魏六朝笔记小说.png", "隋唐演义3.png", "唐宋传奇选封面.png", "清代笔记小说.png",
-            "官场现形记 (2).png", "金瓶梅2.png", "隋唐演义4.png", "大宋中兴通俗演义封面.png",
-            "桃花扇封面.png", "李渔全集2.png", "三言（警世通言 喻世明言 醒世恒言 ）.png", "桃花扇2.png",
+            "汉魏六朝笔记小说.png", "唐宋传奇选封面.png", "清代笔记小说.png",
+            "官场现形记 (2).png", "金瓶梅2.png", "大宋中兴通俗演义封面.png",
+            "李渔全集2.png", "三言（警世通言 喻世明言 醒世恒言 ）.png",
             "唐五代传奇集封面.png", "玉娇梨2.png", "玉娇梨封面.png", "玉娇梨3.png"
         ]
     }
 ] as const;
 
-const coverAliases: Record<string, string> = {
-    "隋唐演义2.png": "隋唐演义封面.png",
-    "隋唐演义3.png": "隋唐演义封面.png",
-    "隋唐演义4.png": "隋唐演义封面.png",
-    "长生殿2.png": "长生殿封面.png",
-    "长生殿3.png": "长生殿封面.png",
-    "桃花扇2.png": "桃花扇封面.png",
-    "桃花扇3.png": "桃花扇封面.png",
-};
+const coverAliases: Record<string, string> = {};
 
 const buildDenseOrbit = (files: readonly string[], step: number, limit = Infinity) => files.flatMap((file, index, orbitFiles) => {
     const insertedCount = Math.floor(index / step);
@@ -321,8 +313,14 @@ export default function Home() {
 
             {/* 页脚独立于特色区，手机端不会成为该区横向布局中的一列。 */}
             <footer className="home-footer home-foreground text-center text-sm opacity-70">
-                <p>© 2025 文心新述 - 古典小说智能改编平台 | 以科技传承文化经典</p>
-                <a href="https://beian.miit.gov.cn" target="_blank" rel="noreferrer">粤ICP备2026132405号-1</a>
+                <p>© 2026 文心新述 - 古典小说智能改编平台 | 以科技传承文化经典</p>
+                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+                    <a href="https://beian.miit.gov.cn" target="_blank" rel="noreferrer">粤ICP备2026132405号-1</a>
+                    <a href="https://beian.mps.gov.cn/#/query/webSearch?code=44060502004803" rel="noreferrer" target="_blank" className="inline-flex items-center gap-1">
+                        <img src="/images/beian-icon.png" alt="公安备案图标" width={18} height={20} className="shrink-0" />
+                        <span>粤公网安备44060502004803号</span>
+                    </a>
+                </div>
             </footer>
         </div>
     );

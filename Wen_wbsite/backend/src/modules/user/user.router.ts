@@ -40,7 +40,8 @@ userRouter.patch('/me/profile', requireAuth, async (req: Request, res: Response)
 // 保存草稿或提交发布；普通用户进入审核队列，管理员作品直接公开。
 userRouter.post('/creation', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { bookId, category = 'other', prompt, content, action = 'draft', draftId } = req.body;
+    // 未显式传类目的旧客户端统一按风格化改编保存，不再产生“其他”分类。
+    const { bookId, category = 'adaptation', prompt, content, action = 'draft', draftId } = req.body;
     if (typeof prompt !== 'string' || !prompt.trim() || typeof content !== 'string' || !content.trim()) {
       return res.status(400).json(error('参数不完整'));
     }
