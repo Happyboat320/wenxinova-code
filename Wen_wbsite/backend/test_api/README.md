@@ -1,5 +1,7 @@
 # DeepSeek 翻译 API 测试
 
+运行前需在本机提供 `backend/texts/唐宋传奇选.txt`；原文及生成的 `samples/` 不随源码分发。
+
 运行：
 
 ```bash

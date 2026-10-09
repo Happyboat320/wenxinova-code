@@ -49,6 +49,9 @@ data/
 /Wen_wbsite/archive/
 /Wen_wbsite/字体/
 /Wen_wbsite/首页设计稿/
+/Wen_wbsite/backend/texts/
+/Wen_wbsite/backend/小说目录信息.xlsx
+/Wen_wbsite/backend/prisma/seed.ts
 /*_cleaned_openrouter.json
 
 # Source archives and local backups
@@ -64,7 +67,8 @@ backup/
 *.backup
 *.before-*
 
-# Generated API benchmark results (keep runner and input fixtures)
+# API benchmark corpus and generated results (keep runner)
+/Wen_wbsite/backend/test_api/samples/
 /Wen_wbsite/backend/test_api/responses/
 /Wen_wbsite/backend/test_api/results.json
 /Wen_wbsite/backend/test_api/耗时报告.md

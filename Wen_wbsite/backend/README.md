@@ -80,10 +80,9 @@ pnpm generate
 
 # 执行数据库迁移
 pnpm migrate
-
-# 填充种子数据（可选）
-pnpm db:seed
 ```
+
+书库数据不随源码分发。需另行提供原文 TXT、小说目录 Excel 和 JSON 数据；导入步骤见 [导入指南](docs/IMPORT_GUIDE.md)。
 
 ### 4. 启动开发服务器
 
@@ -104,7 +103,6 @@ pnpm dev
 | `pnpm migrate:deploy` | 部署数据库迁移（生产环境） |
 | `pnpm generate` | 生成 Prisma 客户端 |
 | `pnpm db:push` | 推送数据库架构（开发环境） |
-| `pnpm db:seed` | 填充种子数据 |
 | `pnpm test` | 运行测试 |
 | `pnpm test:watch` | 监视模式运行测试 |
 
